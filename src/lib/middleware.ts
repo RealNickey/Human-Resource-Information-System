@@ -68,7 +68,10 @@ export async function updateSession(request: NextRequest) {
       return NextResponse.redirect(url)
     }
 
-    if (pathname.startsWith('/employee') && !userRole) {
+    if (
+      pathname.startsWith('/employee') &&
+      !(userRole && ['admin', 'manager', 'employee'].includes(userRole))
+    ) {
       const url = request.nextUrl.clone()
       url.pathname = '/protected'
       return NextResponse.redirect(url)
