@@ -45,7 +45,7 @@ export function SignUpForm({ className, ...props }: React.ComponentPropsWithoutR
         options: {
           emailRedirectTo: `${window.location.origin}/protected`,
           data: {
-            role: role,
+            role,
           },
         },
       })
