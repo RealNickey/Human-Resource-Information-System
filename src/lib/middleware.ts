@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { UserRole } from './types'
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -47,6 +48,34 @@ export async function updateSession(request: NextRequest) {
     const url = request.nextUrl.clone()
     url.pathname = '/auth/login'
     return NextResponse.redirect(url)
+  }
+
+  // Role-based access control
+  if (user) {
+    const userRole = user.user_metadata?.role as UserRole | undefined
+    const pathname = request.nextUrl.pathname
+
+    // Check if accessing role-specific routes
+    if (pathname.startsWith('/admin') && userRole !== 'admin') {
+      const url = request.nextUrl.clone()
+      url.pathname = '/protected'
+      return NextResponse.redirect(url)
+    }
+
+    if (pathname.startsWith('/manager') && userRole !== 'manager' && userRole !== 'admin') {
+      const url = request.nextUrl.clone()
+      url.pathname = '/protected'
+      return NextResponse.redirect(url)
+    }
+
+    if (
+      pathname.startsWith('/employee') &&
+      !(userRole && ['admin', 'manager', 'employee'].includes(userRole))
+    ) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/protected'
+      return NextResponse.redirect(url)
+    }
   }
 
   // IMPORTANT: You *must* return the supabaseResponse object as it is.
