@@ -1,15 +1,11 @@
-import type { CSSProperties } from "react";
 import { redirect } from "next/navigation";
 
-import { AppSidebar } from "@/components/app-sidebar";
 import { AttendanceSummary } from "@/components/attendance-summary";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmployeePersonalInfo } from "@/components/employee-personal-info";
 import { LeaveManagement } from "@/components/leave-management";
 import { ProfileUpdateForm } from "@/components/profile-update-form";
 import { SalaryInformation } from "@/components/salary-information";
-import { SiteHeader } from "@/components/site-header";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { createClient } from "@/lib/server";
 import { Employee, UserRole } from "@/lib/types";
 
@@ -53,58 +49,46 @@ export default async function EmployeeDashboard() {
   const employee = (employeeData as Employee | null) ?? null;
 
   return (
-    <SidebarProvider
-      style={
-        {
-          "--sidebar-width": "calc(var(--spacing) * 72)",
-          "--header-height": "calc(var(--spacing) * 12)",
-        } as CSSProperties
-      }
-    >
-      <AppSidebar variant="inset" />
-      <SidebarInset>
-        <SiteHeader />
-        <div className="flex flex-1 flex-col">
-          <div className="@container/main flex flex-1 flex-col gap-2">
-            <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-              <div className="px-4 lg:px-6">
-                <EmployeePersonalInfo employee={employee} />
-              </div>
+    <main className="min-h-screen bg-muted/20 py-10">
+      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 sm:px-6">
+        <header className="flex flex-col gap-2">
+          <p className="text-sm font-medium text-muted-foreground">Employee Dashboard</p>
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+            {employee
+              ? `Welcome back, ${employee.first_name} ${employee.last_name}`
+              : "Complete your employee profile"}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Review your personal details, track attendance and leave, monitor salary changes, and keep your profile up to date.
+          </p>
+        </header>
 
-              {employee ? (
-                <div className="grid gap-4 px-4 lg:grid-cols-2 lg:px-6">
-                  <AttendanceSummary employeeId={employee.id} />
-                  <LeaveManagement employeeId={employee.id} />
-                </div>
-              ) : (
-                <div className="px-4 lg:px-6">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base font-semibold">
-                        Finish setting up your profile
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground">
-                        We could not find your employee profile yet. Please
-                        contact your HR administrator to complete onboarding.
-                      </p>
-                    </CardContent>
-                  </Card>
-                </div>
-              )}
+        <EmployeePersonalInfo employee={employee} />
 
-              <div className="px-4 lg:px-6">
-                <SalaryInformation employeeId={employee?.id} />
-              </div>
+        {employee ? (
+          <section className="grid gap-6 lg:grid-cols-2">
+            <AttendanceSummary employeeId={employee.id} />
+            <LeaveManagement employeeId={employee.id} />
+          </section>
+        ) : (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base font-semibold">
+                We couldn’t find your employee profile
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Please contact your HR administrator so they can finish onboarding you into the system.
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
-              <div className="px-4 lg:px-6">
-                <ProfileUpdateForm employee={employee} />
-              </div>
-            </div>
-          </div>
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
+        <SalaryInformation employeeId={employee?.id} />
+
+        <ProfileUpdateForm employee={employee} />
+      </div>
+    </main>
   );
 }

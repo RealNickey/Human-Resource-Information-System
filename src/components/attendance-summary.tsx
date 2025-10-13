@@ -7,6 +7,14 @@ import {
   IconCalendar,
   IconClockHour4,
 } from "@tabler/icons-react";
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  XAxis,
+  YAxis,
+} from "recharts";
+import type { ValueType } from "recharts/types/component/DefaultTooltipContent";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +29,11 @@ import {
 } from "@/components/ui/table";
 import { AttendanceRecord, AttendanceStatus } from "@/lib/types";
 import { createClient } from "@/lib/client";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart";
 
 const statusLabels: Record<AttendanceStatus, string> = {
   present: "Present",
@@ -64,10 +77,56 @@ function addMonths(date: Date, delta: number) {
   return new Date(date.getFullYear(), date.getMonth() + delta, 1);
 }
 
+function addDays(date: Date, delta: number) {
+  const next = new Date(date);
+  next.setDate(date.getDate() + delta);
+  return next;
+}
+
+function startOfWeek(date: Date) {
+  const day = date.getDay();
+  const diff = (day + 6) % 7; // Monday as the first day
+  const weekStart = new Date(date);
+  weekStart.setDate(date.getDate() - diff);
+  weekStart.setHours(0, 0, 0, 0);
+  return weekStart;
+}
+
+function formatShortDate(date: Date) {
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function formatDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+const attendanceChartConfig = {
+  presentDays: {
+    label: "Present days",
+    color: "hsl(152, 63%, 45%)",
+  },
+  absenceDays: {
+    label: "Absences & leave",
+    color: "hsl(0, 72%, 52%)",
+  },
+} as const;
+
 export function AttendanceSummary({ employeeId }: AttendanceSummaryProps) {
   const [currentMonth, setCurrentMonth] = useState(startOfMonth(new Date()));
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  const rangeStart = useMemo(
+    () => startOfMonth(addMonths(currentMonth, -2)),
+    [currentMonth]
+  );
+  const rangeEnd = useMemo(() => addMonths(currentMonth, 1), [currentMonth]);
 
   useEffect(() => {
     let ignore = false;
@@ -83,8 +142,8 @@ export function AttendanceSummary({ employeeId }: AttendanceSummaryProps) {
 
       try {
         const supabase = createClient();
-        const firstDay = currentMonth.toISOString().slice(0, 10);
-        const lastDay = addMonths(currentMonth, 1).toISOString().slice(0, 10);
+        const firstDay = formatDateKey(rangeStart);
+        const lastDay = formatDateKey(rangeEnd);
 
         const { data, error } = await supabase
           .from("attendance_records")
@@ -111,13 +170,27 @@ export function AttendanceSummary({ employeeId }: AttendanceSummaryProps) {
     return () => {
       ignore = true;
     };
-  }, [currentMonth, employeeId]);
+  }, [employeeId, rangeEnd, rangeStart]);
+
+  const monthRecords = useMemo(() => {
+    if (!records.length) return [];
+
+    const monthStartTime = currentMonth.getTime();
+    const monthEndTime = addMonths(currentMonth, 1).getTime();
+
+    return records.filter((record) => {
+      const recordDate = new Date(record.date);
+      if (Number.isNaN(recordDate.getTime())) return false;
+      const time = recordDate.getTime();
+      return time >= monthStartTime && time < monthEndTime;
+    });
+  }, [currentMonth, records]);
 
   const metrics = useMemo<AttendanceMetrics>(() => {
-    if (!records.length)
+    if (!monthRecords.length)
       return { presentDays: 0, absentDays: 0, totalHours: 0, leaveDays: 0 };
 
-    return records.reduce(
+    return monthRecords.reduce(
       (acc, record) => {
         if (record.status === "present" || record.status === "partial") {
           acc.presentDays += 1;
@@ -133,9 +206,82 @@ export function AttendanceSummary({ employeeId }: AttendanceSummaryProps) {
       },
       { presentDays: 0, absentDays: 0, totalHours: 0, leaveDays: 0 }
     );
-  }, [records]);
+  }, [monthRecords]);
+
+  const weeklyTrend = useMemo(() => {
+    if (!records.length) return [];
+
+    const buckets = new Map<
+      string,
+      {
+        start: Date;
+        presentDays: number;
+        absenceDays: number;
+      }
+    >();
+
+    for (const record of records) {
+      const date = new Date(record.date);
+      if (Number.isNaN(date.getTime())) continue;
+      const weekStart = startOfWeek(date);
+      const key = formatDateKey(weekStart);
+      const bucket =
+        buckets.get(key) ?? {
+          start: weekStart,
+          presentDays: 0,
+          absenceDays: 0,
+        };
+
+      if (record.status === "present" || record.status === "partial") {
+        bucket.presentDays += 1;
+      }
+
+      if (
+        record.status === "absent" ||
+        record.status === "sick" ||
+        record.status === "holiday"
+      ) {
+        bucket.absenceDays += 1;
+      }
+
+      buckets.set(key, bucket);
+    }
+
+    const normalized: Array<{
+      weekStart: string;
+      rangeLabel: string;
+      label: string;
+      presentDays: number;
+      absenceDays: number;
+    }> = [];
+
+    const start = startOfWeek(rangeStart);
+    const end = startOfWeek(addDays(rangeEnd, -1));
+
+    for (
+      let cursor = new Date(start);
+      cursor.getTime() <= end.getTime();
+      cursor = addDays(cursor, 7)
+    ) {
+      const key = formatDateKey(cursor);
+      const bucket = buckets.get(key);
+      const weekEnd = addDays(cursor, 6);
+
+      normalized.push({
+        weekStart: key,
+        rangeLabel: `${formatShortDate(cursor)} – ${formatShortDate(weekEnd)}`,
+        label: formatShortDate(cursor),
+        presentDays: bucket?.presentDays ?? 0,
+        absenceDays: bucket?.absenceDays ?? 0,
+      });
+    }
+
+    return normalized;
+  }, [rangeEnd, rangeStart, records]);
 
   const monthLabel = monthFormatter.format(currentMonth);
+  const chartData = useMemo(() => weeklyTrend.slice(-8), [weeklyTrend]);
+  const latestWeek = chartData.at(-1);
 
   return (
     <Card>
@@ -186,6 +332,81 @@ export function AttendanceSummary({ employeeId }: AttendanceSummaryProps) {
             isLoading={isLoading}
           />
         </div>
+        <div className="rounded-md border p-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm font-medium">Weekly presence trend</p>
+            {latestWeek && (
+              <span className="text-xs text-muted-foreground">
+                Last week: {latestWeek.presentDays} present · {latestWeek.absenceDays} away
+              </span>
+            )}
+          </div>
+          {isLoading ? (
+            <Skeleton className="mt-4 h-48 w-full" />
+          ) : chartData.length ? (
+            <div className="mt-4">
+              <ChartContainer
+                config={attendanceChartConfig}
+                className="h-48 w-full"
+              >
+                <LineChart data={chartData} margin={{ left: 12, right: 12 }}>
+                  <CartesianGrid strokeDasharray="4 4" vertical={false} />
+                  <XAxis
+                    dataKey="label"
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
+                  />
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    allowDecimals={false}
+                    width={24}
+                  />
+                  <ChartTooltip
+                    cursor={false}
+                    content={
+                      <ChartTooltipContent
+                        labelFormatter={(_, payload) =>
+                          payload?.[0]?.payload?.rangeLabel ?? ""
+                        }
+                        formatter={(value: ValueType) => {
+                          if (Array.isArray(value)) {
+                            return `${value.join(", ")} days`;
+                          }
+
+                          return typeof value === "number"
+                            ? `${value} days`
+                            : value;
+                        }}
+                      />
+                    }
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="presentDays"
+                    stroke="var(--color-presentDays)"
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                    activeDot={{ r: 4 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="absenceDays"
+                    stroke="var(--color-absenceDays)"
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                    activeDot={{ r: 4 }}
+                  />
+                </LineChart>
+              </ChartContainer>
+            </div>
+          ) : (
+            <p className="mt-4 text-sm text-muted-foreground">
+              No attendance activity for the selected period.
+            </p>
+          )}
+        </div>
         <div className="rounded-md border">
           <Table>
             <TableHeader className="bg-muted/50">
@@ -210,8 +431,8 @@ export function AttendanceSummary({ employeeId }: AttendanceSummaryProps) {
                     </TableCell>
                   </TableRow>
                 ))
-              ) : records.length ? (
-                records.map((record) => (
+              ) : monthRecords.length ? (
+                monthRecords.map((record) => (
                   <TableRow key={record.id}>
                     <TableCell>{formatDate(record.date)}</TableCell>
                     <TableCell>

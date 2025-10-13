@@ -1,5 +1,4 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Employee } from "@/lib/types";
@@ -62,55 +61,35 @@ export function EmployeePersonalInfo({ employee }: EmployeePersonalInfoProps) {
             <p className="text-lg font-semibold">
               {employee.first_name} {employee.last_name}
             </p>
-            {employee.position && (
-              <p className="text-sm text-muted-foreground">
-                {employee.position}
-              </p>
-            )}
+            <p className="text-sm text-muted-foreground">Employee information</p>
           </div>
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-4">
-            <div>
-              <p className="text-xs uppercase text-muted-foreground">
-                Employee ID
-              </p>
-              <p className="font-mono text-sm">{employee.employee_id}</p>
-            </div>
-            <div>
-              <p className="text-xs uppercase text-muted-foreground">Email</p>
-              <p className="text-sm">{employee.email}</p>
-            </div>
-            <div>
-              <p className="text-xs uppercase text-muted-foreground">
-                Department
-              </p>
-              <Badge variant="secondary">
-                {employee.department?.name ?? "Unassigned"}
-              </Badge>
-            </div>
+        <dl className="grid gap-6 md:grid-cols-2">
+          <div>
+            <dt className="text-xs uppercase text-muted-foreground">Employee ID</dt>
+            <dd className="font-mono text-sm">{employee.employee_id}</dd>
           </div>
-          <div className="space-y-4">
-            <div>
-              <p className="text-xs uppercase text-muted-foreground">
-                Date of Birth
-              </p>
-              <p className="text-sm">{formatDate(employee.date_of_birth)}</p>
-            </div>
-            <div>
-              <p className="text-xs uppercase text-muted-foreground">
-                Date of Joining
-              </p>
-              <p className="text-sm">{formatDate(employee.date_of_joining)}</p>
-            </div>
-            <div>
-              <p className="text-xs uppercase text-muted-foreground">Phone</p>
-              <p className="text-sm">{employee.phone || "Not provided"}</p>
-            </div>
+          <div>
+            <dt className="text-xs uppercase text-muted-foreground">Department</dt>
+            <dd className="text-sm">
+              {employee.department?.name ?? "Not assigned"}
+            </dd>
           </div>
-        </div>
+          <div>
+            <dt className="text-xs uppercase text-muted-foreground">Email</dt>
+            <dd className="text-sm">{employee.email}</dd>
+          </div>
+          <div>
+            <dt className="text-xs uppercase text-muted-foreground">Date of Birth</dt>
+            <dd className="text-sm">{formatDate(employee.date_of_birth)}</dd>
+          </div>
+          <div>
+            <dt className="text-xs uppercase text-muted-foreground">Date of Joining</dt>
+            <dd className="text-sm">{formatDate(employee.date_of_joining)}</dd>
+          </div>
+        </dl>
       </CardContent>
     </Card>
   );

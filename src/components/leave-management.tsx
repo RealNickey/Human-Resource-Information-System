@@ -1,20 +1,6 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  useTransition,
-  type ReactNode,
-} from "react";
-import {
-  IconBeach,
-  IconCalendarPlus,
-  IconHourglassHigh,
-  IconPlane,
-  IconStars,
-} from "@tabler/icons-react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 
 import {
   submitLeaveRequest,
@@ -46,36 +32,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { LeaveRequest as LeaveRequestType, LeaveType } from "@/lib/types";
+import type { LeaveRequest as LeaveRequestType } from "@/lib/types";
 import { createClient } from "@/lib/client";
-
-const leaveAllowances: Record<LeaveType, number> = {
-  vacation: 25,
-  sick: 15,
-  personal: 5,
-  emergency: 3,
-  maternity: 90,
-  paternity: 14,
-};
-
-const leaveIcons: Record<LeaveType, ReactNode> = {
-  vacation: <IconPlane className="size-4" />,
-  sick: <IconHourglassHigh className="size-4" />,
-  personal: <IconStars className="size-4" />,
-  emergency: <IconBeach className="size-4" />,
-  maternity: <IconCalendarPlus className="size-4" />,
-  paternity: <IconCalendarPlus className="size-4" />,
-};
 
 type LeaveManagementProps = {
   employeeId: number | null | undefined;
-};
-
-type LeaveBalance = {
-  leaveType: LeaveType;
-  allowed: number;
-  used: number;
-  remaining: number;
 };
 
 const formatDate = (date: string) => {
@@ -137,35 +98,38 @@ export function LeaveManagement({ employeeId }: LeaveManagementProps) {
     };
   }, [loadLeaveRequests]);
 
-  const balances = useMemo<LeaveBalance[]>(() => {
-    if (!employeeId) return [];
-    const usageByType = recentRequests.reduce<Record<LeaveType, number>>(
-      (acc, request) => {
-        if (request.status !== "approved") return acc;
-        acc[request.leave_type] =
-          (acc[request.leave_type] ?? 0) + request.days_requested;
-        return acc;
-      },
-      {
-        vacation: 0,
-        sick: 0,
-        personal: 0,
-        emergency: 0,
-        maternity: 0,
-        paternity: 0,
-      }
-    );
-
-    return (Object.keys(leaveAllowances) as LeaveType[]).map((leaveType) => {
-      const allowed = leaveAllowances[leaveType];
-      const used = usageByType[leaveType] ?? 0;
+  const leaveSummary = useMemo(() => {
+    if (!employeeId) {
       return {
-        leaveType,
-        allowed,
-        used,
-        remaining: Math.max(allowed - used, 0),
+        approvedDays: 0,
+        pendingCount: 0,
+        nextLeave: undefined as string | undefined,
       };
-    });
+    }
+
+    const approvedDays = recentRequests
+      .filter((request) => request.status === "approved")
+      .reduce((total, request) => total + request.days_requested, 0);
+
+    const pendingCount = recentRequests.filter(
+      (request) => request.status === "pending"
+    ).length;
+
+    const today = new Date().setHours(0, 0, 0, 0);
+    const upcoming = recentRequests
+      .filter((request) => {
+        const start = new Date(request.start_date).setHours(0, 0, 0, 0);
+        return start >= today && request.status !== "rejected";
+      })
+      .sort((a, b) =>
+        new Date(a.start_date).getTime() - new Date(b.start_date).getTime()
+      )[0];
+
+    return {
+      approvedDays,
+      pendingCount,
+      nextLeave: upcoming ? upcoming.start_date : undefined,
+    };
   }, [employeeId, recentRequests]);
 
   function handleAction(formData: FormData) {
@@ -186,33 +150,38 @@ export function LeaveManagement({ employeeId }: LeaveManagementProps) {
         </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-1 flex-col gap-4">
-        <div className="grid gap-3 sm:grid-cols-2">
-          {isLoading && !recentRequests.length
-            ? Array.from({ length: 4 }).map((_, index) => (
-                <div key={index} className="rounded-md border bg-card p-3">
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="mt-2 h-6 w-16" />
-                </div>
-              ))
-            : balances.map((balance) => (
-                <div
-                  key={balance.leaveType}
-                  className="rounded-md border bg-card p-3"
-                >
-                  <div className="flex items-center gap-2 text-xs uppercase text-muted-foreground">
-                    {leaveIcons[balance.leaveType]}
-                    {balance.leaveType.replace("-", " ")}
-                  </div>
-                  <div className="mt-2 flex items-baseline gap-2">
-                    <span className="text-lg font-semibold">
-                      {balance.remaining}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      of {balance.allowed} days left
-                    </span>
-                  </div>
-                </div>
-              ))}
+        <div className="grid gap-3 sm:grid-cols-3">
+          {isLoading ? (
+            Array.from({ length: 3 }).map((_, index) => (
+              <div
+                key={index}
+                className="rounded-md border bg-card p-3"
+                aria-hidden
+              >
+                <Skeleton className="h-4 w-28" />
+                <Skeleton className="mt-2 h-6 w-16" />
+              </div>
+            ))
+          ) : (
+            <>
+              <SummaryStat
+                label="Approved days this year"
+                value={`${leaveSummary.approvedDays}`}
+              />
+              <SummaryStat
+                label="Pending requests"
+                value={`${leaveSummary.pendingCount}`}
+              />
+              <SummaryStat
+                label="Next scheduled leave"
+                value={
+                  leaveSummary.nextLeave
+                    ? formatDate(leaveSummary.nextLeave)
+                    : "None scheduled"
+                }
+              />
+            </>
+          )}
         </div>
         <div className="rounded-md border">
           <Table>
@@ -348,5 +317,19 @@ function LeaveStatusBadge({ status }: LeaveStatusBadgeProps) {
     >
       {status}
     </span>
+  );
+}
+
+type SummaryStatProps = {
+  label: string;
+  value: string;
+};
+
+function SummaryStat({ label, value }: SummaryStatProps) {
+  return (
+    <div className="rounded-md border bg-card p-3">
+      <p className="text-xs uppercase text-muted-foreground">{label}</p>
+      <p className="mt-2 text-lg font-semibold text-foreground">{value}</p>
+    </div>
   );
 }
