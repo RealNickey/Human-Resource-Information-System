@@ -40,13 +40,12 @@ import {
 } from "@/components/ui/table";
 import type { LeaveRequest as LeaveRequestType } from "@/lib/types";
 import { createClient } from "@/lib/client";
+import { ANNUAL_LEAVE_ALLOWANCE } from "@/lib/constants";
 
 type LeaveManagementProps = {
   employeeId: number | null | undefined;
   remainingLeave?: number;
 };
-
-const ANNUAL_LEAVE_ALLOWANCE = 20;
 
 const formatDate = (date: string) => {
   const parsed = new Date(date);
