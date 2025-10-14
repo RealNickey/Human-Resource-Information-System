@@ -18,8 +18,8 @@ export default async function ManagerDashboard() {
 
   const userRole = data.claims.user_metadata?.role as UserRole | undefined;
 
-  // Ensure only managers and admins can access this page
-  if (userRole !== "manager" && userRole !== "admin") {
+  // Ensure only managers can access this page
+  if (userRole !== "manager") {
     redirect("/protected");
   }
 

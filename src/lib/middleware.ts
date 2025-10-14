@@ -59,9 +59,6 @@ export async function updateSession(request: NextRequest) {
     
     // Redirect based on user role
     switch (userRole) {
-      case 'admin':
-        url.pathname = '/admin/dashboard'
-        break
       case 'manager':
         url.pathname = '/manager/dashboard'
         break
@@ -80,13 +77,7 @@ export async function updateSession(request: NextRequest) {
     const userRole = user.user_metadata?.role as UserRole | undefined
 
     // Check if accessing role-specific routes
-    if (pathname.startsWith('/admin') && userRole !== 'admin') {
-      const url = request.nextUrl.clone()
-      url.pathname = '/protected'
-      return NextResponse.redirect(url)
-    }
-
-    if (pathname.startsWith('/manager') && userRole !== 'manager' && userRole !== 'admin') {
+    if (pathname.startsWith('/manager') && userRole !== 'manager') {
       const url = request.nextUrl.clone()
       url.pathname = '/protected'
       return NextResponse.redirect(url)
@@ -94,7 +85,7 @@ export async function updateSession(request: NextRequest) {
 
     if (
       pathname.startsWith('/employee') &&
-      !(userRole && ['admin', 'manager', 'employee'].includes(userRole))
+      !(userRole && ['manager', 'employee'].includes(userRole))
     ) {
       const url = request.nextUrl.clone()
       url.pathname = '/protected'
