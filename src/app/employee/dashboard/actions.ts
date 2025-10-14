@@ -16,8 +16,45 @@ export type LeaveRequestState =
   | { status: "success"; message: string }
   | { status: "error"; message: string };
 
+export type CreateProfileState =
+  | { status: "idle" }
+  | { status: "success"; message: string }
+  | { status: "error"; message: string };
+
+export type DeleteProfileState =
+  | { status: "idle" }
+  | { status: "success"; message: string }
+  | { status: "error"; message: string };
+
+export type DeleteLeaveState =
+  | { status: "idle" }
+  | { status: "success"; message: string }
+  | { status: "error"; message: string };
+
 const profileSchema = z.object({
   employee_id: z.coerce.number(),
+  employee_code: z.string().trim().min(1, "Employee ID is required").max(64),
+  first_name: z.string().trim().min(1, "First name is required").max(255),
+  last_name: z.string().trim().min(1, "Last name is required").max(255),
+  date_of_birth: z
+    .string()
+    .optional()
+    .refine(
+      (value) => !value || !Number.isNaN(new Date(value).getTime()),
+      "Provide a valid date of birth"
+    ),
+  date_of_joining: z
+    .string()
+    .min(1, "Date of joining is required")
+    .refine(
+      (value) => !Number.isNaN(new Date(value).getTime()),
+      "Provide a valid joining date"
+    ),
+  department_id: z
+    .union([z.coerce.number(), z.literal(""), z.null()])
+    .transform((value) => (typeof value === "number" && Number.isFinite(value) ? value : null))
+    .optional(),
+  position: z.string().trim().max(255).optional(),
   phone: z.string().trim().max(255).optional(),
   address: z.string().trim().max(1024).optional(),
   emergency_contact_name: z.string().trim().max(255).optional(),
@@ -58,6 +95,13 @@ export async function updateEmployeeProfile(
     }
 
     const updates = {
+      employee_id: submission.employee_code,
+      first_name: submission.first_name,
+      last_name: submission.last_name,
+      date_of_birth: submission.date_of_birth || null,
+      date_of_joining: submission.date_of_joining,
+      department_id: submission.department_id ?? null,
+      position: submission.position || null,
       phone: submission.phone || null,
       address: submission.address || null,
       emergency_contact_name: submission.emergency_contact_name || null,
@@ -103,6 +147,43 @@ const leaveSchema = z.object({
   start_date: z.string().min(1),
   end_date: z.string().min(1),
   reason: z.string().trim().max(1024).optional(),
+});
+
+const createProfileSchema = z.object({
+  employee_code: z.string().trim().min(1, "Employee ID is required").max(64),
+  first_name: z.string().trim().min(1, "First name is required").max(255),
+  last_name: z.string().trim().min(1, "Last name is required").max(255),
+  date_of_birth: z
+    .string()
+    .optional()
+    .refine(
+      (value) => !value || !Number.isNaN(new Date(value).getTime()),
+      "Provide a valid date of birth"
+    ),
+  date_of_joining: z
+    .string()
+    .min(1, "Date of joining is required")
+    .refine(
+      (value) => !Number.isNaN(new Date(value).getTime()),
+      "Provide a valid joining date"
+    ),
+  department_id: z
+    .union([z.coerce.number(), z.literal(""), z.null()])
+    .transform((value) => (typeof value === "number" && Number.isFinite(value) ? value : null))
+    .optional(),
+  position: z.string().trim().max(255).optional(),
+  phone: z.string().trim().max(255).optional(),
+  address: z.string().trim().max(1024).optional(),
+  emergency_contact_name: z.string().trim().max(255).optional(),
+  emergency_contact_phone: z.string().trim().max(255).optional(),
+});
+
+const deleteProfileSchema = z.object({
+  employee_id: z.coerce.number(),
+});
+
+const deleteLeaveSchema = z.object({
+  leave_id: z.coerce.number(),
 });
 
 export async function submitLeaveRequest(
@@ -181,6 +262,214 @@ export async function submitLeaveRequest(
       };
     }
     console.error("Unexpected error submitting leave request", error);
+    return {
+      status: "error",
+      message: "Something went wrong, please try again.",
+    };
+  }
+}
+
+export async function createEmployeeProfile(
+  _prevState: CreateProfileState,
+  formData: FormData
+): Promise<CreateProfileState> {
+  try {
+    const submission = createProfileSchema.parse(Object.fromEntries(formData));
+
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { status: "error", message: "You must be signed in." };
+    }
+
+    const userEmail = user.email;
+    if (!userEmail) {
+      return {
+        status: "error",
+        message: "Your account must have an email address configured.",
+      };
+    }
+
+    const { data: existing } = await supabase
+      .from("employees")
+      .select("id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (existing) {
+      return {
+        status: "error",
+        message: "You already have an employee profile.",
+      };
+    }
+
+    const { error } = await supabase.from("employees").insert({
+      user_id: user.id,
+      employee_id: submission.employee_code,
+      first_name: submission.first_name,
+      last_name: submission.last_name,
+      email: userEmail,
+      date_of_birth: submission.date_of_birth || null,
+      date_of_joining: submission.date_of_joining,
+      department_id: submission.department_id ?? null,
+      position: submission.position || null,
+      phone: submission.phone || null,
+      address: submission.address || null,
+      emergency_contact_name: submission.emergency_contact_name || null,
+      emergency_contact_phone: submission.emergency_contact_phone || null,
+    });
+
+    if (error) {
+      console.error("Failed to create employee profile", error);
+      return {
+        status: "error",
+        message:
+          "Could not create your profile. Choose a different employee ID and try again.",
+      };
+    }
+
+    revalidatePath("/employee/dashboard");
+
+    return {
+      status: "success",
+      message: "Profile created successfully.",
+    };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return { status: "error", message: "Please complete all required fields." };
+    }
+    console.error("Unexpected error creating employee profile", error);
+    return {
+      status: "error",
+      message: "Something went wrong, please try again.",
+    };
+  }
+}
+
+export async function deleteEmployeeProfile(
+  _prevState: DeleteProfileState,
+  formData: FormData
+): Promise<DeleteProfileState> {
+  try {
+    const submission = deleteProfileSchema.parse(Object.fromEntries(formData));
+
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { status: "error", message: "You must be signed in." };
+    }
+
+    const { data: employee, error: employeeError } = await supabase
+      .from("employees")
+      .select("id, user_id")
+      .eq("id", submission.employee_id)
+      .single();
+
+    if (employeeError || !employee) {
+      return { status: "error", message: "Employee profile not found." };
+    }
+
+    if (employee.user_id !== user.id) {
+      return {
+        status: "error",
+        message: "You can only delete your own profile.",
+      };
+    }
+
+    const { error } = await supabase
+      .from("employees")
+      .delete()
+      .eq("id", submission.employee_id);
+
+    if (error) {
+      console.error("Failed to delete employee profile", error);
+      return { status: "error", message: "Could not delete your profile." };
+    }
+
+    revalidatePath("/employee/dashboard");
+
+    return {
+      status: "success",
+      message: "Profile deleted successfully.",
+    };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return { status: "error", message: "Invalid request." };
+    }
+    console.error("Unexpected error deleting employee profile", error);
+    return {
+      status: "error",
+      message: "Something went wrong, please try again.",
+    };
+  }
+}
+
+export async function deleteLeaveRequest(
+  _prevState: DeleteLeaveState,
+  formData: FormData
+): Promise<DeleteLeaveState> {
+  try {
+    const submission = deleteLeaveSchema.parse(Object.fromEntries(formData));
+
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { status: "error", message: "You must be signed in." };
+    }
+
+    const { data: leave, error: leaveError } = await supabase
+      .from("leave_requests")
+      .select("id, employee_id")
+      .eq("id", submission.leave_id)
+      .single();
+
+    if (leaveError || !leave) {
+      return { status: "error", message: "Leave request not found." };
+    }
+
+    const { data: employee, error: employeeError } = await supabase
+      .from("employees")
+      .select("id, user_id")
+      .eq("id", leave.employee_id)
+      .single();
+
+    if (employeeError || !employee || employee.user_id !== user.id) {
+      return {
+        status: "error",
+        message: "You can only manage your own leave requests.",
+      };
+    }
+
+    const { error } = await supabase
+      .from("leave_requests")
+      .delete()
+      .eq("id", submission.leave_id);
+
+    if (error) {
+      console.error("Failed to delete leave request", error);
+      return { status: "error", message: "Could not delete leave request." };
+    }
+
+    revalidatePath("/employee/dashboard");
+
+    return {
+      status: "success",
+      message: "Leave request deleted.",
+    };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return { status: "error", message: "Invalid request." };
+    }
+    console.error("Unexpected error deleting leave request", error);
     return {
       status: "error",
       message: "Something went wrong, please try again.",

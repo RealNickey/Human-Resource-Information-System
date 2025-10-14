@@ -1,14 +1,18 @@
 import { redirect } from "next/navigation";
 
 import { AttendanceSummary } from "@/components/attendance-summary";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  EmployeeDashboardSummary,
+  type EmployeeDashboardSummaryData,
+} from "@/components/employee-dashboard-summary";
+import { EmployeeProfileSetupForm } from "@/components/employee-profile-setup-form";
 import { EmployeePersonalInfo } from "@/components/employee-personal-info";
 import { LeaveManagement } from "@/components/leave-management";
 import { LogoutButton } from "@/components/logout-button";
 import { ProfileUpdateForm } from "@/components/profile-update-form";
 import { SalaryInformation } from "@/components/salary-information";
 import { createClient } from "@/lib/server";
-import { Employee, UserRole } from "@/lib/types";
+import { Department, Employee, UserRole } from "@/lib/types";
 
 export default async function EmployeeDashboard() {
   const supabase = await createClient();
@@ -48,6 +52,14 @@ export default async function EmployeeDashboard() {
     .maybeSingle();
 
   const employee = (employeeData as Employee | null) ?? null;
+  const { data: departmentData } = await supabase
+    .from("departments")
+    .select("id, name")
+    .order("name", { ascending: true });
+
+  const departments = (departmentData as Array<Pick<Department, "id" | "name">>) ?? [];
+  const summary = employee ? await buildEmployeeSummary(supabase, employee.id) : null;
+  const userEmail = data.claims.email as string | null | undefined;
 
   return (
     <main className="min-h-screen bg-muted/20 py-10">
@@ -69,32 +81,132 @@ export default async function EmployeeDashboard() {
           </div>
         </header>
 
-        <EmployeePersonalInfo employee={employee} />
-
         {employee ? (
-          <section className="grid gap-6 lg:grid-cols-2">
-            <AttendanceSummary employeeId={employee.id} />
-            <LeaveManagement employeeId={employee.id} />
-          </section>
+          <>
+            <EmployeeDashboardSummary data={summary} isLoading={!employee} />
+
+            <EmployeePersonalInfo employee={employee} />
+
+            <section className="grid gap-6 lg:grid-cols-2">
+              <AttendanceSummary employeeId={employee.id} />
+              <LeaveManagement employeeId={employee.id} />
+            </section>
+
+            <SalaryInformation employeeId={employee.id} />
+
+            <ProfileUpdateForm employee={employee} departments={departments} />
+          </>
         ) : (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base font-semibold">
-                We couldn’t find your employee profile
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Please contact your HR administrator so they can finish onboarding you into the system.
-              </p>
-            </CardContent>
-          </Card>
+          <EmployeeProfileSetupForm email={userEmail} departments={departments} />
         )}
-
-        <SalaryInformation employeeId={employee?.id} />
-
-        <ProfileUpdateForm employee={employee} />
       </div>
     </main>
   );
+}
+
+// Annual leave allowance used to compute remaining leave days.
+const ANNUAL_LEAVE_ALLOWANCE = 20;
+
+const friendlyDateFormatter = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+});
+
+type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
+
+async function buildEmployeeSummary(
+  supabase: SupabaseServerClient,
+  employeeId: number
+): Promise<EmployeeDashboardSummaryData> {
+  const now = new Date();
+  const monthStartIso = toIsoDate(new Date(now.getFullYear(), now.getMonth(), 1));
+  const nextMonthStartIso = toIsoDate(new Date(now.getFullYear(), now.getMonth() + 1, 1));
+  const yearStartIso = toIsoDate(new Date(now.getFullYear(), 0, 1));
+  const nextYearStartIso = toIsoDate(new Date(now.getFullYear() + 1, 0, 1));
+
+  const [attendanceResult, leaveResult] = await Promise.all([
+    supabase
+      .from("attendance_records")
+      .select("status")
+      .eq("employee_id", employeeId)
+      .gte("date", monthStartIso)
+      .lt("date", nextMonthStartIso),
+    supabase
+      .from("leave_requests")
+      .select("days_requested")
+      .eq("employee_id", employeeId)
+      .eq("status", "approved")
+      .gte("start_date", yearStartIso)
+      .lt("start_date", nextYearStartIso),
+  ]);
+
+  if (attendanceResult.error) {
+    console.error("Failed to load attendance summary", attendanceResult.error);
+  }
+
+  if (leaveResult.error) {
+    console.error("Failed to load leave summary", leaveResult.error);
+  }
+
+  const attendance = attendanceResult.data ?? [];
+  const leaveRequests = leaveResult.data ?? [];
+
+  const daysWorkedThisMonth = attendance.filter(
+    (record) => record.status === "present" || record.status === "partial"
+  ).length;
+
+  const leaveDaysTakenThisYear = leaveRequests.reduce(
+    (total, request) => total + (request.days_requested ?? 0),
+    0
+  );
+
+  const leavesRemaining = Math.max(ANNUAL_LEAVE_ALLOWANCE - leaveDaysTakenThisYear, 0);
+  const nextPayday = calculateNextPayday(now);
+
+  return {
+    daysWorkedThisMonth,
+    leaveDaysTakenThisYear,
+    leavesRemaining,
+    nextPaydayLabel: friendlyDateFormatter.format(nextPayday),
+  };
+}
+
+function toIsoDate(date: Date) {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function calculateNextPayday(reference: Date) {
+  const current = new Date(reference);
+  current.setHours(0, 0, 0, 0);
+
+  const daysInMonth = new Date(
+    current.getFullYear(),
+    current.getMonth() + 1,
+    0
+  ).getDate();
+
+  const targetDay = Math.min(30, daysInMonth);
+  let payday = new Date(current.getFullYear(), current.getMonth(), targetDay);
+  payday.setHours(0, 0, 0, 0);
+
+  if (payday <= current) {
+    const nextMonth = new Date(current.getFullYear(), current.getMonth() + 1, 1);
+    const nextMonthDays = new Date(
+      nextMonth.getFullYear(),
+      nextMonth.getMonth() + 1,
+      0
+    ).getDate();
+
+    payday = new Date(
+      nextMonth.getFullYear(),
+      nextMonth.getMonth(),
+      Math.min(30, nextMonthDays)
+    );
+    payday.setHours(0, 0, 0, 0);
+  }
+
+  return payday;
 }

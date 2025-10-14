@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { IconCircleCheckFilled, IconLoader } from "@tabler/icons-react";
+import { IconCircleCheckFilled, IconLoader, IconTrash } from "@tabler/icons-react";
 
 import {
   updateEmployeeProfile,
+  deleteEmployeeProfile,
   type UpdateProfileState,
+  type DeleteProfileState,
 } from "@/app/employee/dashboard/actions";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,15 +21,18 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Employee } from "@/lib/types";
+import { Employee, type Department } from "@/lib/types";
 
 interface ProfileUpdateFormProps {
   employee: Employee | null;
+  departments: Array<Pick<Department, "id" | "name">>;
 }
 
-export function ProfileUpdateForm({ employee }: ProfileUpdateFormProps) {
+export function ProfileUpdateForm({ employee, departments }: ProfileUpdateFormProps) {
   const [state, setState] = useState<UpdateProfileState>({ status: "idle" });
+  const [deleteState, setDeleteState] = useState<DeleteProfileState>({ status: "idle" });
   const [isPending, startTransition] = useTransition();
+  const [isDeleting, startDeleteTransition] = useTransition();
   const [formKey, setFormKey] = useState(0);
 
   useEffect(() => {
@@ -41,6 +46,13 @@ export function ProfileUpdateForm({ employee }: ProfileUpdateFormProps) {
     });
   }
 
+  function handleDelete(formData: FormData) {
+    startDeleteTransition(async () => {
+      const result = await deleteEmployeeProfile(deleteState, formData);
+      setDeleteState(result);
+    });
+  }
+
   if (!employee) {
     return null;
   }
@@ -50,12 +62,96 @@ export function ProfileUpdateForm({ employee }: ProfileUpdateFormProps) {
       <CardHeader>
         <CardTitle className="text-base font-semibold">Profile</CardTitle>
         <CardDescription>
-          Keep your contact information current.
+            Keep your employment information current. Deleting your profile removes all related records.
         </CardDescription>
       </CardHeader>
       <form key={formKey} action={handleAction}>
         <input type="hidden" name="employee_id" value={employee.id} />
-        <CardContent className="grid gap-4 md:grid-cols-2">
+  <CardContent className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-2">
+              <Label htmlFor="employee_code">Employee ID</Label>
+              <Input
+                id="employee_code"
+                name="employee_code"
+                defaultValue={employee.employee_id}
+                placeholder="e.g. EMP123"
+                required
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="email" className="text-muted-foreground">
+                Email
+              </Label>
+              <Input
+                id="email"
+                name="email"
+                defaultValue={employee.email}
+                readOnly
+                disabled
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="first_name">First name</Label>
+              <Input
+                id="first_name"
+                name="first_name"
+                defaultValue={employee.first_name}
+                required
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="last_name">Last name</Label>
+              <Input
+                id="last_name"
+                name="last_name"
+                defaultValue={employee.last_name}
+                required
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="date_of_birth">Date of birth</Label>
+              <Input
+                id="date_of_birth"
+                name="date_of_birth"
+                type="date"
+                defaultValue={employee.date_of_birth ?? undefined}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="date_of_joining">Date of joining</Label>
+              <Input
+                id="date_of_joining"
+                name="date_of_joining"
+                type="date"
+                defaultValue={employee.date_of_joining}
+                required
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="department_id">Department</Label>
+              <select
+                id="department_id"
+                name="department_id"
+                defaultValue={employee.department_id ?? ""}
+                className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="">Select department</option>
+                {departments.map((department) => (
+                  <option key={department.id} value={department.id}>
+                    {department.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="position">Position</Label>
+              <Input
+                id="position"
+                name="position"
+                defaultValue={employee.position ?? ""}
+                placeholder="e.g. Software Engineer"
+              />
+            </div>
           <div className="grid gap-2">
             <Label htmlFor="phone">Phone number</Label>
             <Input
@@ -115,6 +211,26 @@ export function ProfileUpdateForm({ employee }: ProfileUpdateFormProps) {
           </Button>
         </CardFooter>
       </form>
+      <form
+        action={handleDelete}
+        className="flex items-center justify-between gap-2 border-t px-6 pb-6 pt-4 text-sm"
+      >
+        <input type="hidden" name="employee_id" value={employee.id} />
+        <DeleteStatus state={deleteState} />
+        <Button
+          variant="outline"
+          type="submit"
+          disabled={isDeleting}
+          className="text-destructive hover:text-destructive"
+        >
+          {isDeleting ? (
+            <IconLoader className="mr-2 size-4 animate-spin" />
+          ) : (
+            <IconTrash className="mr-2 size-4" />
+          )}
+          Delete profile
+        </Button>
+      </form>
     </Card>
   );
 }
@@ -138,4 +254,21 @@ function StatusMessage({ state }: { state: UpdateProfileState }) {
       Changes require manager approval for certain fields.
     </p>
   );
+}
+
+function DeleteStatus({ state }: { state: DeleteProfileState }) {
+  if (state.status === "success") {
+    return (
+      <p className="flex items-center gap-2 text-emerald-600">
+        <IconCircleCheckFilled className="size-4" />
+        {state.message}
+      </p>
+    );
+  }
+
+  if (state.status === "error") {
+    return <p className="text-rose-600">{state.message}</p>;
+  }
+
+  return <p className="text-muted-foreground">Deleting is permanent.</p>;
 }
