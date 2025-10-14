@@ -39,6 +39,8 @@ export async function updateSession(request: NextRequest) {
   const { data } = await supabase.auth.getClaims()
   const user = data?.claims
 
+  const pathname = request.nextUrl.pathname
+
   if (
     !user &&
     !request.nextUrl.pathname.startsWith('/login') &&
@@ -50,10 +52,32 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
+  // If user is logged in and trying to access auth/login pages, redirect to appropriate dashboard
+  if (user && (pathname.startsWith('/auth') || pathname === '/')) {
+    const userRole = user.user_metadata?.role as UserRole | undefined
+    const url = request.nextUrl.clone()
+    
+    // Redirect based on user role
+    switch (userRole) {
+      case 'admin':
+        url.pathname = '/admin/dashboard'
+        break
+      case 'manager':
+        url.pathname = '/manager/dashboard'
+        break
+      case 'employee':
+        url.pathname = '/employee/dashboard'
+        break
+      default:
+        url.pathname = '/protected'
+        break
+    }
+    return NextResponse.redirect(url)
+  }
+
   // Role-based access control
   if (user) {
     const userRole = user.user_metadata?.role as UserRole | undefined
-    const pathname = request.nextUrl.pathname
 
     // Check if accessing role-specific routes
     if (pathname.startsWith('/admin') && userRole !== 'admin') {
