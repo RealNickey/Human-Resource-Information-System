@@ -46,6 +46,8 @@ type LeaveManagementProps = {
   remainingLeave?: number;
 };
 
+const ANNUAL_LEAVE_ALLOWANCE = 20;
+
 const formatDate = (date: string) => {
   const parsed = new Date(date);
   if (Number.isNaN(parsed.getTime())) return date;
