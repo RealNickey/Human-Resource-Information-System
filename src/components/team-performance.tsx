@@ -1,95 +1,103 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { IconTrendingUp } from "@tabler/icons-react";
+import { useCallback, useEffect, useState, useTransition } from "react";
+import { IconRefresh, IconTrendingUp } from "@tabler/icons-react";
 
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { LatestPerformance } from "@/lib/types";
 import { createClient } from "@/lib/client";
 
-interface TeamPerformanceProps {
-  departmentId: number | null | undefined;
-}
+type PerformanceSummary = {
+  averageScore: number | null;
+  reviewCount: number;
+};
 
-export function TeamPerformance({ departmentId }: TeamPerformanceProps) {
-  const [avgScore, setAvgScore] = useState<number | null>(null);
+export function TeamPerformance() {
+  const [summary, setSummary] = useState<PerformanceSummary>({
+    averageScore: null,
+    reviewCount: 0,
+  });
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isPending, startTransition] = useTransition();
 
-  useEffect(() => {
-    let cancelled = false;
+  const loadPerformance = useCallback(async () => {
+    setIsLoading(true);
+    setIsRefreshing(true);
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("latest_performance")
+        .select("employee_id, overall_rating, performance_score");
 
-    async function loadPerformance() {
-      if (!departmentId) {
-        setAvgScore(null);
-        setIsLoading(false);
+      if (error) throw error;
+
+      const evaluations = (data ?? []) as LatestPerformance[];
+      if (!evaluations.length) {
+        setSummary({ averageScore: null, reviewCount: 0 });
         return;
       }
 
-      setIsLoading(true);
-      try {
-        const supabase = createClient();
-        const weekAgo = new Date();
-        weekAgo.setDate(weekAgo.getDate() - 7);
-        const weekAgoStr = weekAgo.toISOString().split("T")[0];
+      const validScores = evaluations
+        .map(
+          (evaluation) =>
+            evaluation.overall_rating ?? evaluation.performance_score ?? null
+        )
+        .filter((score): score is number => score !== null);
 
-        const { data: employees } = await supabase
-          .from("employees")
-          .select("id")
-          .eq("department_id", departmentId);
-
-        if (!employees || employees.length === 0) {
-          if (!cancelled) setAvgScore(null);
-          return;
-        }
-
-        const employeeIds = employees.map((e) => e.id);
-
-        const { data: evaluations } = await supabase
-          .from("performance_evaluations")
-          .select("performance_score")
-          .in("employee_id", employeeIds)
-          .gte("evaluation_period_end", weekAgoStr);
-
-        if (!cancelled) {
-          if (evaluations && evaluations.length > 0) {
-            const scores = evaluations
-              .map((e) => e.performance_score)
-              .filter((s): s is number => s !== null);
-            const avg =
-              scores.length > 0
-                ? scores.reduce((sum, score) => sum + score, 0) / scores.length
-                : null;
-            setAvgScore(avg);
-          } else {
-            setAvgScore(null);
-          }
-        }
-      } catch (error) {
-        console.error("Failed to load team performance", error);
-        if (!cancelled) setAvgScore(null);
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
+      setSummary({
+        averageScore: validScores.length
+          ? validScores.reduce((total, score) => total + score, 0) /
+            validScores.length
+          : null,
+        reviewCount: evaluations.length,
+      });
+    } catch (error) {
+      console.error("Failed to load performance summary", error);
+      setSummary({ averageScore: null, reviewCount: 0 });
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
     }
+  }, []);
 
+  useEffect(() => {
     void loadPerformance();
+  }, [loadPerformance]);
 
-    return () => {
-      cancelled = true;
-    };
-  }, [departmentId]);
+  const handleRefresh = () => {
+    startTransition(async () => {
+      await loadPerformance();
+    });
+  };
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="text-base font-semibold">
-          Team Performance
-        </CardTitle>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <div>
+          <CardTitle className="text-base font-semibold">
+            Performance Snapshot
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Latest review count: {summary.reviewCount}
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleRefresh}
+          disabled={isPending || isRefreshing}
+        >
+          <IconRefresh className="mr-1 size-4" />
+          Refresh
+        </Button>
       </CardHeader>
       <CardContent>
         <div className="rounded-md border bg-card p-4">
           <p className="text-xs uppercase text-muted-foreground">
-            Average weekly performance score
+            Average score (latest evaluations)
           </p>
           <div className="mt-2 flex items-center gap-2">
             <IconTrendingUp className="size-5 text-emerald-600" />
@@ -97,12 +105,16 @@ export function TeamPerformance({ departmentId }: TeamPerformanceProps) {
               <Skeleton className="h-8 w-24" />
             ) : (
               <span className="text-2xl font-semibold">
-                {avgScore !== null ? avgScore.toFixed(1) : "—"}
+                {summary.averageScore !== null
+                  ? summary.averageScore.toFixed(1)
+                  : "—"}
               </span>
             )}
           </div>
           <p className="text-xs text-muted-foreground">
-            {avgScore !== null ? "Last 7 days" : "No recent evaluations"}
+            {summary.averageScore !== null
+              ? "Based on latest recorded performance reviews"
+              : "No performance reviews available"}
           </p>
         </div>
       </CardContent>

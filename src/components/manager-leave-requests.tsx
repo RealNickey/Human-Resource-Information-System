@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
-import { IconCheck, IconX } from "@tabler/icons-react";
+import { useCallback, useEffect, useState, useTransition } from "react";
+import { IconCheck, IconRefresh, IconX } from "@tabler/icons-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -15,190 +15,181 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { LeaveRequest, LeaveStatus } from "@/lib/types";
+import type { LeaveRequest, LeaveStatus } from "@/lib/types";
 import { createClient } from "@/lib/client";
 
 interface ManagerLeaveRequestsProps {
-  departmentId: number | null | undefined;
   managerId: number | null | undefined;
 }
 
 type LeaveRequestWithEmployee = LeaveRequest & {
   employee_name: string;
-  employee_id_str: string;
+  employee_code: string;
+  remaining_leave: number;
+};
+
+const STATUS_STYLES: Record<LeaveStatus, string> = {
+  approved:
+    "bg-emerald-100 text-emerald-900 dark:bg-emerald-500/10 dark:text-emerald-200",
+  rejected: "bg-red-100 text-red-900 dark:bg-red-500/10 dark:text-red-200",
+  pending:
+    "bg-amber-100 text-amber-900 dark:bg-amber-500/10 dark:text-amber-200",
 };
 
 function formatDate(date: string) {
   const parsed = new Date(date);
   if (Number.isNaN(parsed.getTime())) return date;
-  return parsed.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return parsed.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
-export function ManagerLeaveRequests({
-  departmentId,
-  managerId,
-}: ManagerLeaveRequestsProps) {
+export function ManagerLeaveRequests({ managerId }: ManagerLeaveRequestsProps) {
   const [requests, setRequests] = useState<LeaveRequestWithEmployee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  const loadLeaveRequests = async () => {
-    if (!departmentId) {
-      setRequests([]);
-      setIsLoading(false);
-      return;
-    }
-
+  const loadLeaveRequests = useCallback(async () => {
     setIsLoading(true);
+    setIsRefreshing(true);
     try {
       const supabase = createClient();
-
-      const { data: employees } = await supabase
+      const { data: employees, error: employeesError } = await supabase
         .from("employees")
-        .select("id, employee_id, first_name, last_name")
-        .eq("department_id", departmentId);
+        .select(
+          "id, employee_id, first_name, last_name, annual_leave_remaining"
+        )
+        .order("last_name", { ascending: true });
 
-      if (!employees || employees.length === 0) {
-        setRequests([]);
-        return;
-      }
+      if (employeesError) throw employeesError;
 
       const employeeMap = new Map(
-        employees.map((e) => [
-          e.id,
-          { name: `${e.first_name} ${e.last_name}`, empId: e.employee_id },
+        (employees ?? []).map((employee) => [
+          employee.id,
+          {
+            name: `${employee.first_name} ${employee.last_name}`,
+            code: employee.employee_id,
+            remaining: employee.annual_leave_remaining ?? 0,
+          },
         ])
       );
-      const employeeIds = employees.map((e) => e.id);
 
-      const { data: leaveData, error } = await supabase
+      const { data: leaveData, error: leaveError } = await supabase
         .from("leave_requests")
         .select("*")
-        .in("employee_id", employeeIds)
         .order("created_at", { ascending: false })
-        .limit(50);
+        .limit(100);
 
-      if (error) throw error;
+      if (leaveError) throw leaveError;
 
-      const requestsWithNames: LeaveRequestWithEmployee[] =
-        leaveData?.map((request) => {
-          const empInfo = employeeMap.get(request.employee_id);
-          return {
-            ...request,
-            employee_name: empInfo?.name || "Unknown",
-            employee_id_str: empInfo?.empId || "—",
-          };
-        }) ?? [];
-      setRequests(requestsWithNames);
+      const mapped = (leaveData ?? []).map((request) => {
+        const employeeDetails = employeeMap.get(request.employee_id);
+        return {
+          ...request,
+          employee_name: employeeDetails?.name ?? "Unknown",
+          employee_code: employeeDetails?.code ?? "—",
+          remaining_leave: employeeDetails?.remaining ?? 0,
+        };
+      });
+
+      setRequests(mapped);
     } catch (error) {
       console.error("Failed to load leave requests", error);
       setRequests([]);
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    let cancelled = false;
+    void loadLeaveRequests();
+  }, [loadLeaveRequests]);
 
-    async function load() {
-      await loadLeaveRequests();
-    }
-
-    if (!cancelled) {
-      void load();
-    }
-
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [departmentId]);
-
-  const handleStatusUpdate = async (
-    requestId: number,
-    newStatus: LeaveStatus
-  ) => {
+  const handleStatusUpdate = (requestId: number, nextStatus: LeaveStatus) => {
     if (!managerId) {
-      toast.error("Manager ID not found");
+      toast.error("Manager profile not found.");
       return;
     }
 
     startTransition(async () => {
       try {
         const supabase = createClient();
-        const updateData: {
-          status: LeaveStatus;
-          approved_by: number;
-          approved_at: string;
-          rejection_reason?: string | null;
-        } = {
-          status: newStatus,
-          approved_by: managerId,
-          approved_at: new Date().toISOString(),
-        };
 
-        if (newStatus === "rejected") {
-          updateData.rejection_reason = "Rejected by manager";
+        if (nextStatus === "approved") {
+          const { error } = await supabase.rpc("approve_leave", {
+            p_leave_id: requestId,
+            p_approver_employee_id: managerId,
+          });
+          if (error) throw error;
+        } else if (nextStatus === "rejected") {
+          const { error } = await supabase.rpc("reject_leave", {
+            p_leave_id: requestId,
+            p_approver_employee_id: managerId,
+          });
+          if (error) throw error;
         }
 
-        const { error } = await supabase
-          .from("leave_requests")
-          .update(updateData)
-          .eq("id", requestId);
-
-        if (error) throw error;
-
-        toast.success(
-          `Leave request ${newStatus === "approved" ? "approved" : "rejected"}`
-        );
+        toast.success(`Leave request ${nextStatus}.`);
         await loadLeaveRequests();
       } catch (error) {
         console.error("Failed to update leave request", error);
-        toast.error("Failed to update leave request");
+        toast.error("Unable to update leave request.");
       }
     });
   };
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-base font-semibold">
           Leave Requests
         </CardTitle>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => void loadLeaveRequests()}
+          disabled={isRefreshing}
+        >
+          <IconRefresh className="mr-1 size-4" />
+          Refresh
+        </Button>
       </CardHeader>
       <CardContent>
         <div className="rounded-md border">
           <Table>
             <TableHeader className="bg-muted/50">
               <TableRow>
-                <TableHead>Employee ID</TableHead>
-                <TableHead>Name</TableHead>
+                <TableHead>Employee</TableHead>
+                <TableHead>Remaining Leave</TableHead>
                 <TableHead>From</TableHead>
                 <TableHead>To</TableHead>
-                <TableHead>Reason</TableHead>
+                <TableHead>Days</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                Array.from({ length: 5 }).map((_, index) => (
+                Array.from({ length: 6 }).map((_, index) => (
                   <TableRow key={index}>
+                    <TableCell>
+                      <Skeleton className="h-4 w-32" />
+                    </TableCell>
                     <TableCell>
                       <Skeleton className="h-4 w-20" />
                     </TableCell>
                     <TableCell>
-                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-4 w-20" />
                     </TableCell>
                     <TableCell>
-                      <Skeleton className="h-4 w-24" />
+                      <Skeleton className="h-4 w-20" />
                     </TableCell>
                     <TableCell>
-                      <Skeleton className="h-4 w-24" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-4 w-12" />
                     </TableCell>
                     <TableCell>
                       <Skeleton className="h-4 w-20" />
@@ -211,27 +202,27 @@ export function ManagerLeaveRequests({
               ) : requests.length ? (
                 requests.map((request) => (
                   <TableRow key={request.id}>
-                    <TableCell className="font-medium">
-                      {request.employee_id_str}
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="font-medium">
+                          {request.employee_name}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {request.employee_code}
+                        </span>
+                      </div>
                     </TableCell>
-                    <TableCell>{request.employee_name}</TableCell>
+                    <TableCell>{request.remaining_leave}</TableCell>
                     <TableCell>{formatDate(request.start_date)}</TableCell>
                     <TableCell>{formatDate(request.end_date)}</TableCell>
-                    <TableCell className="max-w-xs truncate">
-                      {request.reason || "—"}
-                    </TableCell>
+                    <TableCell>{request.days_requested}</TableCell>
                     <TableCell>
                       <span
                         className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                          request.status === "approved"
-                            ? "bg-emerald-100 text-emerald-900 dark:bg-emerald-500/10 dark:text-emerald-200"
-                            : request.status === "rejected"
-                            ? "bg-red-100 text-red-900 dark:bg-red-500/10 dark:text-red-200"
-                            : "bg-amber-100 text-amber-900 dark:bg-amber-500/10 dark:text-amber-200"
+                          STATUS_STYLES[request.status]
                         }`}
                       >
-                        {request.status.charAt(0).toUpperCase() +
-                          request.status.slice(1)}
+                        {request.status}
                       </span>
                     </TableCell>
                     <TableCell className="text-right">
@@ -261,10 +252,8 @@ export function ManagerLeaveRequests({
                           </Button>
                         </div>
                       ) : (
-                        <span className="text-sm text-muted-foreground">
-                          {request.status === "approved"
-                            ? "Approved"
-                            : "Rejected"}
+                        <span className="text-sm text-muted-foreground capitalize">
+                          {request.status}
                         </span>
                       )}
                     </TableCell>

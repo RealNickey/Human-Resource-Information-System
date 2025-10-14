@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { IconCircleCheckFilled, IconLoader, IconTrash } from "@tabler/icons-react";
+import {
+  IconCircleCheckFilled,
+  IconLoader,
+  IconTrash,
+} from "@tabler/icons-react";
 
 import {
   updateEmployeeProfile,
@@ -28,9 +32,14 @@ interface ProfileUpdateFormProps {
   departments: Array<Pick<Department, "id" | "name">>;
 }
 
-export function ProfileUpdateForm({ employee, departments }: ProfileUpdateFormProps) {
+export function ProfileUpdateForm({
+  employee,
+  departments,
+}: ProfileUpdateFormProps) {
   const [state, setState] = useState<UpdateProfileState>({ status: "idle" });
-  const [deleteState, setDeleteState] = useState<DeleteProfileState>({ status: "idle" });
+  const [deleteState, setDeleteState] = useState<DeleteProfileState>({
+    status: "idle",
+  });
   const [isPending, startTransition] = useTransition();
   const [isDeleting, startDeleteTransition] = useTransition();
   const [formKey, setFormKey] = useState(0);
@@ -62,104 +71,19 @@ export function ProfileUpdateForm({ employee, departments }: ProfileUpdateFormPr
       <CardHeader>
         <CardTitle className="text-base font-semibold">Profile</CardTitle>
         <CardDescription>
-            Keep your employment information current. Deleting your profile removes all related records.
+          Keep your employment information current. Deleting your profile
+          removes all related records.
         </CardDescription>
       </CardHeader>
       <form key={formKey} action={handleAction}>
         <input type="hidden" name="employee_id" value={employee.id} />
-  <CardContent className="grid gap-4 md:grid-cols-2">
-            <div className="grid gap-2">
-              <Label htmlFor="employee_code">Employee ID</Label>
-              <Input
-                id="employee_code"
-                name="employee_code"
-                defaultValue={employee.employee_id}
-                placeholder="e.g. EMP123"
-                required
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="email" className="text-muted-foreground">
-                Email
-              </Label>
-              <Input
-                id="email"
-                name="email"
-                defaultValue={employee.email}
-                readOnly
-                disabled
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="first_name">First name</Label>
-              <Input
-                id="first_name"
-                name="first_name"
-                defaultValue={employee.first_name}
-                required
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="last_name">Last name</Label>
-              <Input
-                id="last_name"
-                name="last_name"
-                defaultValue={employee.last_name}
-                required
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="date_of_birth">Date of birth</Label>
-              <Input
-                id="date_of_birth"
-                name="date_of_birth"
-                type="date"
-                defaultValue={employee.date_of_birth ?? undefined}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="date_of_joining">Date of joining</Label>
-              <Input
-                id="date_of_joining"
-                name="date_of_joining"
-                type="date"
-                defaultValue={employee.date_of_joining}
-                required
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="department_id">Department</Label>
-              <select
-                id="department_id"
-                name="department_id"
-                defaultValue={employee.department_id ?? ""}
-                className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
-                <option value="">Select department</option>
-                {departments.map((department) => (
-                  <option key={department.id} value={department.id}>
-                    {department.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="position">Position</Label>
-              <Input
-                id="position"
-                name="position"
-                defaultValue={employee.position ?? ""}
-                placeholder="e.g. Software Engineer"
-              />
-            </div>
-          <div className="grid gap-2">
-            <Label htmlFor="phone">Phone number</Label>
-            <Input
-              id="phone"
-              name="phone"
-              defaultValue={employee.phone ?? ""}
-              placeholder="e.g. +1 555 123 4567"
-            />
+        <CardContent className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-1">
+            <Label className="text-muted-foreground">Employee ID</Label>
+            <Input defaultValue={employee.employee_id} readOnly disabled />
+            <p className="text-xs text-muted-foreground">
+              Assigned automatically by the system.
+            </p>
           </div>
           <div className="grid gap-2">
             <Label htmlFor="email" className="text-muted-foreground">
@@ -171,6 +95,77 @@ export function ProfileUpdateForm({ employee, departments }: ProfileUpdateFormPr
               defaultValue={employee.email}
               readOnly
               disabled
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="first_name">First name</Label>
+            <Input
+              id="first_name"
+              name="first_name"
+              defaultValue={employee.first_name}
+              required
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="last_name">Last name</Label>
+            <Input
+              id="last_name"
+              name="last_name"
+              defaultValue={employee.last_name}
+              required
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="date_of_birth">Date of birth</Label>
+            <Input
+              id="date_of_birth"
+              name="date_of_birth"
+              type="date"
+              defaultValue={employee.date_of_birth ?? undefined}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="date_of_joining">Date of joining</Label>
+            <Input
+              id="date_of_joining"
+              name="date_of_joining"
+              type="date"
+              defaultValue={employee.date_of_joining}
+              required
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="department_id">Department</Label>
+            <select
+              id="department_id"
+              name="department_id"
+              defaultValue={employee.department_id ?? ""}
+              className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <option value="">Select department</option>
+              {departments.map((department) => (
+                <option key={department.id} value={department.id}>
+                  {department.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="position">Position</Label>
+            <Input
+              id="position"
+              name="position"
+              defaultValue={employee.position ?? ""}
+              placeholder="e.g. Software Engineer"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="phone">Phone number</Label>
+            <Input
+              id="phone"
+              name="phone"
+              defaultValue={employee.phone ?? ""}
+              placeholder="e.g. +1 555 123 4567"
             />
           </div>
           <div className="grid gap-2 md:col-span-2">

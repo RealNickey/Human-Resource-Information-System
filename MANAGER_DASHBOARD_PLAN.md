@@ -1,304 +1,296 @@
-# Manager Dashboard Completion & Enhancement Plan
+# Minimal Manager Dashboard Implementation Plan (Reduced Scope)
 
 Date: 2025-10-14  
-Scope: Deliver a fully functional Manager Dashboard with real-time, secure, performant access to team performance, employee directory (read‑only profiles), attendance tracking (searchable), leave request management (approve/reject), and persistent team announcements. Add finishing polish across UX, accessibility, reliability, observability, and documentation.
+Scope: ONLY the essential HRIS features required for initial Manager + Employee workflows. No advanced analytics, no announcements, no sparkline charts, no pagination, no audit/event logging. Focus on working CRUD with Supabase + correct role restrictions.
+
+Included Minimal Features:
+
+1. Authentication & basic role guard (manager vs employee) for `/manager/dashboard`.
+2. Employees:
+
+- Manager can view a list of all employees (ID, full name, position/job title — minimal columns).
+- Manager can open / view basic employee details (read-only) including remaining leave balance & salary (if permitted).
+- Employee ID auto-filled in all employee-originated forms (leave request, attendance self-view if later added).
+
+3. Attendance:
+
+- Manager can view attendance records for employees over a selectable date range.
+- Manager can mark (create/update) attendance for a specific employee & date (status: Present / Absent [MVP]).
+- Employees may (optional) view their own attendance (read-only) — keep simple if already scaffolded.
+
+4. Leave:
+
+- Employee can submit a leave request (auto-filled employee_id; status defaults to pending).
+- Manager can view all leave requests (all employees) and approve OR reject (no need for rejection reason field; simple status toggle + timestamp + approved_by manager id).
+- Display remaining leave balance for each employee (e.g. annual leave remaining) while creating or reviewing a request.
+
+5. Salary:
+
+- Manager can view base salary info per employee (amount + currency + effective_from).
+- Employee can view their own salary info.
+
+6. Performance (Basic):
+
+- Show a simple latest performance score OR average of last N (e.g. last 3) evaluations for each employee (table column or small card). No charts, no trend lines.
+
+Out of Scope / Explicitly NOT Implemented Now:
+
+- Announcements, pinning, real-time features, sparkline/trend charts, CSV export, pagination, audit logging, complex filters, search, advanced a11y refinements, caching layers, optimistic update complexity (simple refetch acceptable).
 
 ---
 
-## 1. Current State vs Required Features
+## 1. Minimal Data Model (Tables & Fields)
 
-| Feature                              | Current Status                                                    | Gaps / Needed Enhancements                                                                                                                                   |
-| ------------------------------------ | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Auth & Role Gate                     | Middleware + role check (redirect)                                | Centralize role guard helper; add audit logging (manager actions).                                                                                           |
-| Average Weekly Performance           | `TeamPerformance` component calculates last 7 days avg            | Add loading/error fallback message; cache layer; handle no evaluations gracefully (already partially). Possibly visualize trend (sparklines).                |
-| Employee List (ID + Name)            | `TeamEmployees` shows ID, name, position + View Profile dialog    | Add search & optional pagination if team large; restrict columns fetched; add skeleton already present; audit open profile action if sensitive.              |
-| View Employee Profile (Read-only)    | Dialog includes personal & emergency info                         | Add data classification & conceal sensitive fields unless policy allows (e.g. emergency contact maybe manager-only is fine); add print/export (optional).    |
-| Attendance Tracking (Filter by Name) | `ManagerAttendanceTracking` with search & last 30 days            | Add column for status legend tooltip; add date range filter & CSV export; performance: move mapping logic server side / use single RPC.                      |
-| Leave Requests (Approve/Reject)      | `ManagerLeaveRequests` with actions & toasts                      | Add confirmation dialog (reject reason input); optimistic updates; filter by status; pagination; audit trail (store approved_by & rejection_reason already). |
-| Team Announcements (Create)          | UI only; DOES NOT persist                                         | Add `team_announcements` table + RLS + list existing recent announcements; allow delete (manager only) & expiry; show most recent N to employees.            |
-| Security / RLS                       | Core tables have RLS + manager policies for SELECT/UPDATE (leave) | Need policies for announcements; refine employees policy to avoid duplicate exposure if overlapping; consider separate admin bypass policies.                |
-| Error Handling                       | Console errors + toasts                                           | Add error boundary component; central Supabase error normalizer; structured logging.                                                                         |
-| Testing                              | None specified                                                    | Add unit tests (utils), integration (Supabase queries via service role in CI), E2E (Playwright).                                                             |
-| Docs                                 | Multiple markdowns exist                                          | Add this plan + update USAGE_GUIDE & ROLE_BASED_AUTH for manager flows.                                                                                      |
+Use or create only what is strictly necessary. (Adjust naming to match any existing tables if already present.)
+
+employees (assumed existing core table)
+
+- id (bigint PK)
+- user_id (uuid -> auth.users.id)
+- full_name text
+- position text
+- annual_leave_remaining integer (can live here for MVP; later move to separate balances table if needed)
+- base_salary numeric(12,2) (MVP: store current salary directly; advanced history handled later)
+- performance_last_score numeric(5,2) (optional denormalized helper for quick display) OR compute from evaluations table
+
+attendance
+
+- id bigint generated identity PK
+- employee_id bigint references employees(id) on delete cascade
+- att_date date not null
+- status text check (status in ('present','absent')) not null
+- created_at timestamptz default now()
+- unique (employee_id, att_date)
+
+leave_requests
+
+- id bigint generated identity PK
+- employee_id bigint references employees(id) on delete cascade
+- start_date date not null
+- end_date date not null
+- type text default 'annual' (keep minimal)
+- status text default 'pending' check (status in ('pending','approved','rejected'))
+- approved_by bigint references employees(id)
+- approved_at timestamptz
+- created_at timestamptz default now()
+
+performance_evaluations (optional if not already)
+
+- id bigint identity PK
+- employee_id bigint references employees(id) on delete cascade
+- score numeric(5,2) not null
+- period_start date
+- period_end date
+- created_at timestamptz default now()
+
+salary_records (only if you prefer history; otherwise skip and store base_salary on employees)
+
+- id bigint identity
+- employee_id bigint references employees(id)
+- amount numeric(12,2) not null
+- currency text default 'USD'
+- effective_from date not null
+- created_at timestamptz default now()
+
+If historical tables (salary_records, performance_evaluations) are omitted, adapt code to read denormalized fields from employees.
 
 ---
 
-## 2. Data Model Additions & Adjustments
+## 2. Minimal RLS Policies (Conceptual)
 
-### 2.1 New Table: `team_announcements`
+Goal: Employees see only their own sensitive data; Managers see all employees & related HR data required.
+
+employees (SELECT):
+
+- Allow employee to select own row (user_id = auth.uid()).
+- Allow manager role to select all rows.
+
+attendance:
+
+- SELECT: employee sees own records; manager role sees all.
+- INSERT/UPDATE: manager role only (for marking attendance). (Later optionally allow employee self-mark with pending state.)
+
+leave_requests:
+
+- SELECT: employee sees own; manager role sees all.
+- INSERT: employee can insert for self (employee_id must match their row).
+- UPDATE: manager role can update status fields; employee cannot modify once created (except maybe cancel while pending - skip for MVP).
+
+performance_evaluations (if used):
+
+- SELECT: employee sees own; manager sees all.
+
+salary_records or employees.base_salary:
+
+- SELECT: employee sees own salary; manager role sees all salaries.
+
+Implement policies using role claim in JWT (e.g. auth.jwt() -> role) or join employees table via auth.uid().
+
+---
+
+## 3. Minimal UI / Components
+
+Manager Dashboard (page):
+
+- Employees table: columns (Employee ID, Name, Position, Remaining Leave, Base Salary, Latest Performance Score) + View button.
+- Employee detail modal: shows basic profile + remaining leave + salary + last performance score.
+- Attendance section: date range selector (start/end date) + table (Employee, Date, Status). Form to mark attendance (select employee, date, status). Auto-fill today date convenience.
+- Leave requests section: table (Employee, Dates, Type, Status, Actions). Approve/Reject buttons.
+
+Employee Self Pages (if already exist):
+
+- Leave request form (auto-fill employee ID from session; show remaining leave).
+- Salary & performance simple display card.
+
+Shared minimal components:
+
+- Basic DateRangePicker (could reuse existing calendar if present) for attendance.
+- Simple StatusBadge (approved / pending / rejected; present / absent).
+
+---
+
+## 4. Key Interactions / Flows
+
+Mark Attendance (Manager):
+
+1. Select employee.
+2. Pick date (default today).
+3. Choose status (present/absent).
+4. Submit -> Upsert (if record exists update, else insert). Refresh list.
+
+Submit Leave (Employee):
+
+1. Open leave form; employee_id hidden & auto-filled from session.
+2. Choose start_date, end_date, type (optional). Submit -> status 'pending'.
+3. Decrement remaining leave UI side only after approval (MVP can decrement immediately on approval server-side).
+
+Approve/Reject Leave (Manager):
+
+1. View pending list.
+2. Click Approve -> update status, set approved_by & approved_at; decrement employee annual_leave_remaining (if using that approach) inside a single DB call (RPC or transaction) to avoid race.
+3. Click Reject -> update status to rejected (no reason required for MVP).
+
+View Performance (Manager/Employee):
+
+- If using evaluations table: query last 1 (ORDER BY created_at DESC LIMIT 1) or compute AVG over last 3. Show numeric value only.
+
+Show Remaining Leave:
+
+- Display `employees.annual_leave_remaining` directly.
+
+---
+
+## 5. Minimal Server / Data Layer
+
+Supabase client usage only (no extra caching):
+
+- employees: select necessary columns only.
+- attendance: range filter `att_date >= from AND att_date <= to`.
+- leave_requests: simple select (maybe order by created_at desc).
+- Upserts: attendance mark implemented via `insert ... on conflict (employee_id, att_date) do update set status = excluded.status` (defined by unique constraint).
+- Leave approval: single update call with match on id AND current status = 'pending' (optional). If also decrement leave balance: perform a Postgres function (preferred) `rpc('approve_leave', { p_leave_id })` that updates leave_requests and employees remaining leave atomically.
+
+Optional single SQL function (MVP nice-to-have):
 
 ```sql
-create table if not exists public.team_announcements (
-  id bigint generated by default as identity primary key,
-  department_id bigint not null references public.departments(id) on delete cascade,
-  created_by bigint not null references public.employees(id) on delete set null,
-  message text not null,
-  expires_at timestamptz,
-  pinned boolean default false,
-  created_at timestamptz not null default now()
-);
-
-alter table public.team_announcements enable row level security;
+create or replace function approve_leave(p_leave_id bigint, p_approver_id bigint)
+returns void language plpgsql security definer as $$
+declare v_emp bigint; v_days int; v_status text; begin
+  select employee_id, status, (end_date - start_date + 1) into v_emp, v_status, v_days from leave_requests where id = p_leave_id for update;
+  if v_status <> 'pending' then raise exception 'Already processed'; end if;
+  update leave_requests set status='approved', approved_by=p_approver_id, approved_at=now() where id=p_leave_id;
+  update employees set annual_leave_remaining = annual_leave_remaining - v_days where id = v_emp;
+end; $$;
 ```
 
-### 2.2 RLS Policies
+RLS must allow execution by manager role.
 
-- Read: Authenticated users whose employee.department_id = announcement.department_id
-- Insert: Only employees who are managers of that department (match departments.manager_id OR user role claim == "manager" and same department)
-- Update/Delete: Only creator OR department manager (for pin/unpin or removal)
-
-Example policies (pseudo):
-
-```sql
-create policy "announcements viewable to department" on public.team_announcements
-for select to authenticated using (
-  department_id in (
-    select e.department_id from public.employees e where e.user_id = auth.uid()
-  )
-);
-
-create policy "announcements insert by manager" on public.team_announcements
-for insert to authenticated with check (
-  (select e.id from public.employees e where e.user_id = auth.uid() limit 1) in (
-    select d.manager_id from public.departments d where d.id = team_announcements.department_id
-  )
-);
-```
-
-(Adjust to actual final logic + maybe a helper secure function—detailed implementation step below.)
-
-### 2.3 Optional Enhancements
-
-- Materialized weekly performance view for large data sets later: `department_weekly_performance (department_id, week_start, avg_score)` with CRON refresh.
-- Attendance summary view for aggregated hours & statuses.
+Reject function similar but without decrement.
 
 ---
 
-## 3. Supabase Client & Server Layer Enhancements
+## 6. Minimal Implementation Checklist (Actionable)
 
-| Concern                    | Action                                                                                                                                     |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| Repeated client-side joins | Add server-side edge function or RPC to fetch aggregated attendance + employee names in one call.                                          |
-| Error standardization      | Utility `normalizeSupabaseError(error): { code, message }`.                                                                                |
-| Caching (optional)         | Use Next.js route segment caching for read-mostly endpoints (performance panel) with revalidation (60s).                                   |
-| Audit logging              | Create lightweight server action to log manager actions (approve/reject, announcement create) into `audit_events` table (optional future). |
+Schema / Migrations
+[ ] Create/verify tables: attendance, leave_requests (and optionally performance_evaluations, salary_records) with minimal columns.
+[ ] Add unique constraint on (employee_id, att_date) in attendance.
+[ ] Add indexes: attendance(att_date), leave_requests(status).
+[ ] Add/confirm columns on employees: annual_leave_remaining, base_salary, performance_last_score (if denormalizing).
+[ ] Write required RLS policies for each table (self vs manager) & enable RLS.
+[ ] (Optional) Approve/Reject SQL functions for atomic updates.
 
-`audit_events` (optional future): id, actor_employee_id, action_type, entity, entity_id, metadata jsonb, created_at.
+Types / Lib
+[ ] Update `lib/types.ts` with TS interfaces: EmployeeMinimal, AttendanceRecord, LeaveRequest, PerformanceEvaluation (optional).
+[ ] Add helper `getSessionEmployee()` to fetch employee row for current auth user.
+[ ] Add simple `supabaseServer()` / `supabaseBrowser()` usage (if not already) for data fetches.
 
----
+Attendance UI
+[ ] Create date range state (defaults: today - 7 days to today?).
+[ ] Query attendance via Supabase with range filter.
+[ ] Render table (Employee, Date, Status).
+[ ] Attendance mark form (select employee, date, status) -> upsert.
+[ ] Refresh list after submit.
 
-## 4. UI / Component Enhancements
+Leave UI
+[ ] Employee leave request form (start_date, end_date, type) auto-fill employee_id.
+[ ] Insert pending leave; show simple success/fail message.
+[ ] Manager leave requests table with Approve / Reject buttons.
+[ ] On Approve: call update (or RPC) -> refresh.
+[ ] On Reject: update status -> refresh.
+[ ] Display remaining leave in both forms & manager employee list.
 
-### 4.1 Announcements Component
+Employees UI
+[ ] Manager employee list query (id, full_name, position, annual_leave_remaining, base_salary, performance_last_score).
+[ ] View details modal (same fields plus maybe contact email if allowed).
 
-- Fetch existing announcements (limit 10, order by pinned DESC, created_at DESC)
-- Show relative time (e.g., "2h ago")
-- Add pinned badge & filter out expired (expires_at < now())
-- Provide form fields: message (required), optional expiry datetime, pin toggle
-- Provide delete & pin/unpin buttons (only for manager)
+Salary & Performance
+[ ] If using historical tables: latest salary record query; latest or average performance query.
+[ ] Else: show denormalized fields directly.
 
-### 4.2 Leave Requests
+Security & Access
+[ ] Middleware redirect non-manager away from `/manager/...` routes.
+[ ] Ensure employee forms validate employee_id === session employee.id (never trust client-sent id).
 
-- Add status filter (All / Pending / Approved / Rejected)
-- Add confirmation dialog for rejection with reason textarea
-- Optimistic UI update (update local state before refetch) with rollback on error
+Basic Validation
+[ ] Prevent negative remaining leave (check before decrement or clamp >=0).
+[ ] Leave request date sanity: end_date >= start_date.
 
-### 4.3 Attendance Tracking
+Testing (Smoke Level)
+[ ] Manager can list employees (expect >0 rows in seed data).
+[ ] Employee submits leave -> appears as pending for manager.
+[ ] Manager approves leave -> status changes, remaining leave decreases by correct day count.
+[ ] Manager marks attendance -> record visible immediately.
+[ ] Date range filter changes attendance list size (simulate narrowing range).
 
-- Add date range picker (default last 30 days)
-- Show total present days vs absences summary bar above table
-- Provide export CSV button (client-side generated)
+Docs
+[ ] Replace old plan with this minimal plan (done).
+[ ] Update `ROLE_BASED_AUTH.md` with simplified policies summary.
+[ ] Add short usage steps to `USAGE_GUIDE.md` (submit leave, approve leave, mark attendance).
 
-### 4.4 Team Employees
-
-- Add search by name / ID (client filter first; server search later if large)
-- Add optional column toggle (position, date of joining)
-- Provide copy-to-clipboard for employee email
-
-### 4.5 Performance Card
-
-- Add 7-day trend sparkline (reuse `chart.tsx` primitives)
-- Show count of evaluations included in average
-
-### 4.6 Global Enhancements
-
-- Create `LoadingState` & `ErrorState` small components for reuse.
-- Add accessible focus management when dialogs open/close.
-
----
-
-## 5. Routing & Access Control
-
-| Route                  | Guard                                                               |
-| ---------------------- | ------------------------------------------------------------------- |
-| `/manager/dashboard`   | Role: manager OR admin; redirect else                               |
-| Announcement mutations | Validate manager ownership of department client & server side       |
-| Leave approval         | Double-check managerId belongs to matching department before update |
-
-Add helper: `assertManagerOfDepartment(supabase, user_id, department_id)` returning boolean; used in server actions (if introduced) to prevent forged client updates.
-
----
-
-## 6. Implementation Steps (Detailed)
-
-1. Migration: add `team_announcements` table & RLS policies.
-2. Update `supabase/migrations/` with new timestamped SQL file.
-3. Extend `lib/types.ts` with `TeamAnnouncement` interface.
-4. Enhance `TeamAnnouncements` component:
-   - Replace mock with real Supabase CRUD (list, create, delete, pin toggle).
-   - Add local optimistic updates.
-5. Enhance `ManagerLeaveRequests`:
-   - Add filters, rejection reason dialog, optimistic status update.
-6. Improve `ManagerAttendanceTracking`:
-   - Add date range filter, summary stats, CSV export.
-7. Improve `TeamEmployees`:
-   - Add search, column toggle, small UI utilities.
-8. Add `TeamPerformance` sparkline (query more than one week: last 6 weeks, aggregate weekly client side or via RPC).
-9. Shared utilities: `useAsync` hook for loading/error; `formatters.ts` for date/time.
-10. Introduce audit logging optional (stretch if time allows).
-11. Add tests (see section 10).
-12. Update docs (README feature list, ROLE_BASED_AUTH, USAGE_GUIDE).
-13. Final QA + accessibility review.
-14. Deployment & migration run instructions.
+Deployment
+[ ] Run migrations on Supabase instance.
+[ ] Set environment variables in deployment platform.
+[ ] Manual smoke test with one manager + one employee account.
 
 ---
 
-## 7. Security & RLS Considerations
+## 7. Acceptance Criteria (Minimal)
 
-- Sensitive profile fields are already restricted by policy (currently employees table policy lets managers view by department; confirm least privilege: ensure no cross-department leakage through OR conditions).
-- Add explicit policy limiting employees SELECT to either self OR same department as manager; current policy "managers can view team employees" combined with owner policy is fine but review for duplicates.
-- Ensure announcement insertion restricted: only department manager; may need to set `departments.manager_id` field (add update migration linking existing manager accounts if not set).
-- Validate on mutation that manager's `employees.department_id` equals target department (defense-in-depth beyond RLS).
-- Rate-limit announcements (client-side min interval; future: edge function + throttle table).
-
----
-
-## 8. Performance Optimizations
-
-| Area                      | Optimization                                                                             |
-| ------------------------- | ---------------------------------------------------------------------------------------- |
-| Attendance query          | Single SELECT with required columns only; potential server RPC returning joined records. |
-| Repeated employee lookups | Cache employee map in context provider for dashboard session.                            |
-| Performance evaluations   | Request only `performance_score` & `evaluation_period_end`.                              |
-| Announcements list        | Limit to recent N & apply incremental fetch (Load more).                                 |
-| Rendering                 | Use React.memo for table rows if dataset large; virtualization (future if >500 rows).    |
+- [ ] Manager dashboard loads employee list (with remaining leave & salary column) without errors.
+- [ ] Manager can mark attendance; data persists and re-fetch shows new/updated status.
+- [ ] Manager can view attendance filtered by date range.
+- [ ] Employee can submit a leave request; status = pending.
+- [ ] Manager can approve and reject leave; status persists; approving reduces remaining leave.
+- [ ] Remaining leave displays correctly before and after approval.
+- [ ] Salary info visible to manager for all, and to employee for themselves.
+- [ ] Performance score (latest or average) shown (even if placeholder or denormalized field) with graceful fallback if none.
+- [ ] Employee detail modal shows expected fields; no unauthorized data leak occurs under RLS tests.
+- [ ] Basic RLS smoke tests confirm: employee cannot read another employee's leave request directly.
 
 ---
 
-## 9. Observability & Error Handling
+## 8. Notes & Future (After MVP)
 
-- Central `logError(context, error)` util (structured: { component, action, message, stack }).
-- Toast user-friendly messages; hide raw Supabase errors.
-- Optional Sentry integration (environment variable toggled) for production.
-- Error boundary around manager dashboard child components.
+After this minimal slice is stable, future increments can add: search, pagination, announcements, trend charts, CSV export, audit logging, improved accessibility & testing depth, real-time updates, and performance optimization.
 
----
-
-## 10. Testing Strategy
-
-| Test Type              | Scope                                                                                                                                     |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| Unit                   | Utilities (formatDate, CSV export), hooks (useAsync).                                                                                     |
-| Integration (Supabase) | Announcement CRUD with service role key; leave approval updates status/approved_by; RLS negative tests (unauthorized should fail).        |
-| E2E (Playwright)       | Manager login -> dashboard loads; approve leave request; create announcement -> appears; filter attendance; open employee profile dialog. |
-| Accessibility          | axe automated scan for dashboard page & dialogs.                                                                                          |
-
-CI Pipeline Additions:
-
-- Run migrations against ephemeral DB
-- Seed minimal test data (avoid dummy wide dataset for speed)
-- Execute unit + integration + e2e headless
-
----
-
-## 11. Accessibility & UX Polish
-
-- Provide aria-labels for action buttons (Approve/Reject with request ID for screen readers)
-- Ensure dialog focus trap & `aria-describedby` for rejection reason
-- Color contrast check for status badges (sick/holiday variants)
-- Add keyboard shortcuts (e.g., / to focus employee search)
-- Toasts: add role="status" or role="alert" semantics as library allows
-
----
-
-## 12. Documentation Updates
-
-- `MANAGER_DASHBOARD_PLAN.md` (this file)
-- Update `ROLE_BASED_AUTH.md` with new announcement policies & clarified manager capabilities.
-- Update `USAGE_GUIDE.md` with manager workflow examples (Approve leave, Post announcement).
-- Add section to `README.md` listing manager dashboard features and screenshot (optional).
-
----
-
-## 13. Deployment & Migration
-
-1. Add migration file; commit.
-2. Deploy (Vercel / hosting) – ensure `NEXT_PUBLIC_SUPABASE_URL` & service keys set.
-3. Run migrations via Supabase CLI or dashboard SQL.
-4. Smoke test: login as manager user; verify features.
-
-Rollback Plan:
-
-- If announcement migration fails, drop `team_announcements` table.
-- Keep feature flag in component: if table not found, degrade gracefully (show info message).
-
----
-
-## 14. Timeline (Indicative)
-
-| Day | Tasks                                                                             |
-| --- | --------------------------------------------------------------------------------- |
-| 1   | Migration + types + announcements CRUD base                                       |
-| 2   | Enhancements: Leave (filters, rejection dialog), Attendance (date range, summary) |
-| 3   | Employees search, Performance sparkline, shared utilities, error boundary         |
-| 4   | Testing (unit/integration), E2E scaffolding, accessibility fixes                  |
-| 5   | Docs updates, polish, performance review, final QA                                |
-
----
-
-## 15. Acceptance Criteria Checklist
-
-- [ ] Announcements persist & list (create, list, pin, delete) with RLS protection.
-- [ ] Weekly performance shows correct average & evaluation count; no console errors.
-- [ ] Employee list searchable; profile dialog read-only; no restricted data leak.
-- [ ] Attendance filter by name & date range; summary stats visible; export works.
-- [ ] Leave requests: approve/reject with optional rejection reason; UI optimistic; reflects DB state after refresh.
-- [ ] All queries scoped to manager department; attempts to access outside department fail under RLS.
-- [ ] A11y: no critical axe errors on dashboard; dialog is keyboard navigable.
-- [ ] Tests pass in CI (unit + integration + basic e2e scenario).
-- [ ] Documentation updated & accurate.
-
----
-
-## 16. Future / Stretch Ideas
-
-- Real-time subscriptions (Supabase Realtime) for leave request status refresh.
-- Notification system (toast or in-app badge) for new announcements.
-- KPI dashboards (headcount, attrition, average tenure).
-- Performance review workflow (draft -> submit -> signoff).
-- Scheduling & shift management.
-
----
-
-## 17. Risks & Mitigations
-
-| Risk                               | Mitigation                                                                                        |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------- |
-| RLS misconfiguration exposing data | Add integration tests asserting unauthorized access fails.                                        |
-| Large data sets slow tables        | Introduce pagination & limit columns early.                                                       |
-| Time zone inconsistencies          | Standardize to UTC in DB; format in client locale.                                                |
-| Race conditions on leave approval  | Use row-level filter + status change check or add condition to update only when status='pending'. |
-| Announcement spam                  | Limit length; optional throttle logic (client + later server).                                    |
-
----
-
-## 18. Data Privacy Notes
-
-- Emergency contact & personal info only visible to manager and HR; confirm with policy (if needed restrict via separate view/table or column-level RLS).
-- Consider masking email/phone for non-manager peers (already not shown to other employees per existing policies). If not implemented, document assumption.
-
----
-
-## 19. Summary
-
-This plan closes the remaining functional gap (persistent announcements) and layers improvements in performance, UX, security, and testing. Following the outlined migration-first approach, we ensure data model stability early, then iterate through UI enhancements, culminating in robust testing and documentation for a production-ready Manager Dashboard.
+This file intentionally avoids complexity to accelerate a working baseline.

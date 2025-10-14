@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import { LogoutButton } from "@/components/logout-button";
 import { ManagerAttendanceTracking } from "@/components/manager-attendance-tracking";
 import { ManagerLeaveRequests } from "@/components/manager-leave-requests";
-import { TeamAnnouncements } from "@/components/team-announcements";
 import { TeamEmployees } from "@/components/team-employees";
 import { TeamPerformance } from "@/components/team-performance";
 import { createClient } from "@/lib/server";
@@ -55,19 +54,13 @@ export default async function ManagerDashboard() {
           </div>
         </header>
 
-        <TeamPerformance departmentId={manager?.department_id} />
+        <TeamPerformance />
 
-        <TeamEmployees departmentId={manager?.department_id} />
+        <TeamEmployees />
 
-        <section className="grid gap-6 lg:grid-cols-2">
-          <ManagerAttendanceTracking departmentId={manager?.department_id} />
-          <TeamAnnouncements departmentId={manager?.department_id} />
-        </section>
+        <ManagerAttendanceTracking />
 
-        <ManagerLeaveRequests
-          departmentId={manager?.department_id}
-          managerId={manager?.id}
-        />
+        <ManagerLeaveRequests managerId={manager?.id} />
       </div>
     </main>
   );

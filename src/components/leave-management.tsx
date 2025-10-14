@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useTransition,
+} from "react";
 
 import {
   submitLeaveRequest,
@@ -37,6 +43,7 @@ import { createClient } from "@/lib/client";
 
 type LeaveManagementProps = {
   employeeId: number | null | undefined;
+  remainingLeave?: number;
 };
 
 const formatDate = (date: string) => {
@@ -45,7 +52,10 @@ const formatDate = (date: string) => {
   return parsed.toLocaleDateString();
 };
 
-export function LeaveManagement({ employeeId }: LeaveManagementProps) {
+export function LeaveManagement({
+  employeeId,
+  remainingLeave,
+}: LeaveManagementProps) {
   const [recentRequests, setRecentRequests] = useState<LeaveRequestType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [state, setState] = useState<LeaveRequestState>({ status: "idle" });
@@ -104,6 +114,7 @@ export function LeaveManagement({ employeeId }: LeaveManagementProps) {
         approvedDays: 0,
         pendingCount: 0,
         nextLeave: undefined as string | undefined,
+        remainingBalance: remainingLeave ?? 0,
       };
     }
 
@@ -121,16 +132,23 @@ export function LeaveManagement({ employeeId }: LeaveManagementProps) {
         const start = new Date(request.start_date).setHours(0, 0, 0, 0);
         return start >= today && request.status !== "rejected";
       })
-      .sort((a, b) =>
-        new Date(a.start_date).getTime() - new Date(b.start_date).getTime()
+      .sort(
+        (a, b) =>
+          new Date(a.start_date).getTime() - new Date(b.start_date).getTime()
       )[0];
+
+    const fallbackRemaining = Math.max(
+      ANNUAL_LEAVE_ALLOWANCE - approvedDays,
+      0
+    );
 
     return {
       approvedDays,
       pendingCount,
       nextLeave: upcoming ? upcoming.start_date : undefined,
+      remainingBalance: remainingLeave ?? fallbackRemaining,
     };
-  }, [employeeId, recentRequests]);
+  }, [employeeId, recentRequests, remainingLeave]);
 
   function handleAction(formData: FormData) {
     startTransition(async () => {
@@ -150,9 +168,9 @@ export function LeaveManagement({ employeeId }: LeaveManagementProps) {
         </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-1 flex-col gap-4">
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-4">
           {isLoading ? (
-            Array.from({ length: 3 }).map((_, index) => (
+            Array.from({ length: 4 }).map((_, index) => (
               <div
                 key={index}
                 className="rounded-md border bg-card p-3"
@@ -171,6 +189,10 @@ export function LeaveManagement({ employeeId }: LeaveManagementProps) {
               <SummaryStat
                 label="Pending requests"
                 value={`${leaveSummary.pendingCount}`}
+              />
+              <SummaryStat
+                label="Remaining leave"
+                value={`${leaveSummary.remainingBalance}`}
               />
               <SummaryStat
                 label="Next scheduled leave"
@@ -281,6 +303,7 @@ export function LeaveManagement({ employeeId }: LeaveManagementProps) {
           </div>
           <div className="flex items-center justify-between sm:col-span-4">
             <p className="text-xs text-muted-foreground">
+              Remaining balance: {leaveSummary.remainingBalance} days{" "}
               {state.status === "error" && (
                 <span className="text-red-500">{state.message}</span>
               )}

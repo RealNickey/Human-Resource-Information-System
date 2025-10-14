@@ -2,127 +2,104 @@
 
 ## Accessing the Manager Dashboard
 
-The manager dashboard is available at `/manager/dashboard` and can only be accessed by users with the `manager` or `admin` role.
+- URL: `/manager/dashboard`
+- Roles: `manager` and `admin`
+- Authentication: Supabase Auth session with JWT `role` claim
 
 ## Prerequisites
 
-Before using the manager dashboard, ensure:
+1. **Database migrations**
 
-1. **Database Setup**: Run all migrations in order:
    ```bash
-   # Apply migrations
    supabase db push
    ```
 
-2. **User Setup**: 
-   - Create a user account with manager role in Supabase Auth
-   - Create an employee record linked to that user with a `department_id`
-   - Ensure other employees exist in the same department for testing
+   This applies the base schema plus `20251014120000_minimal_adjustments.sql`, which adds the `annual_leave_remaining` column, helper views, and approval RPCs.
 
-3. **Dummy Data** (Optional): 
-   - The dummy data migration provides sample data for testing
-   - Update the UUIDs in the migration to match your actual auth users
+2. **User records**
 
-## Features Overview
+   - Create/manage Supabase Auth users with a `manager` role claim.
+   - Ensure each auth user has a matching row in `employees` (linked via `user_id`).
+   - Seed at least one employee row per team member with `annual_leave_remaining`, salary records, attendance data, and optional performance evaluations.
 
-### 1. Team Performance Score
-- Displays the average performance score for your team from the last 7 days
-- Calculated from `performance_evaluations` table
-- Shows "—" if no recent evaluations exist
+3. **Environment**
+   - `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY` must be defined.
+   - The Supabase project must grant the `authenticated` role select access on `latest_salary` and `latest_performance`, plus execute access on the approval RPCs (handled automatically by the migration).
 
-### 2. Team Members List
-- Shows all employees in your department
-- Displays: Employee ID, Name, Position
-- Click "View Profile" to see complete employee details in a read-only dialog
+## Feature Overview
 
-### 3. Attendance Tracking
-- Shows last 30 days of attendance records for all team members
-- **Search Feature**: Type employee name to filter records
-- Color-coded status badges:
-  - 🟢 Green: Present
-  - 🔴 Red: Absent
-  - 🟡 Yellow: Partial Day
-  - 🔵 Blue: Holiday
-  - 🔴 Pink: Sick Leave
+### 1. Employee Directory
 
-### 4. Team Announcements
-- Create announcements for your team members
-- Type your message in the text area
-- Click "Send Announcement" to broadcast
-- (Note: Currently shows success toast, actual persistence can be implemented)
+- Shows every employee (manager visibility is no longer limited by department).
+- Columns: Employee ID, name, position, remaining leave balance, latest salary, and latest performance score.
+- "View Details" opens a dialog with contact information, emergency contacts, salary, performance, and remaining leave.
+- Top-right "Refresh" button re-fetches data from Supabase.
 
-### 5. Leave Request Management
-- View all leave requests from your team
-- Columns: Employee ID, Name, From/To dates, Reason, Status
-- **Pending Requests**: Show Approve/Reject buttons
-- **Processed Requests**: Display approval/rejection status
-- Actions are tracked with manager ID and timestamp
+### 2. Attendance Management
 
-## Database Permissions
+- Date range filter (defaults to the past 7 days) fetches attendance records for all employees.
+- Summary counts show present vs absent entries in the current range.
+- Managers can mark attendance via a simple form (employee, date, status → present/absent). Submissions upsert into `attendance_records` using the composite unique key.
+- Table shows date, employee (with code), status badge, and total hours (if present in the record).
 
-The manager dashboard uses Row Level Security (RLS) policies that allow managers to:
+### 3. Leave Requests
 
-✅ View all employees in their department
-✅ View team attendance records
-✅ View team leave requests
-✅ Update leave request status (approve/reject)
-✅ View team performance evaluations
+- Lists the 100 most recent leave requests for the organization.
+- Displays remaining leave balance alongside each request so managers can confirm availability before approval.
+- Approve/Reject buttons trigger Supabase RPC calls:
+  - `approve_leave` updates status, stamps approver metadata, and deducts `days_requested` from `annual_leave_remaining` (never below zero).
+  - `reject_leave` sets status to rejected and records approver metadata without changing balances.
+- Refresh button pulls the latest request state and employee balances.
 
-❌ Cannot view/edit data from other departments
-❌ Cannot view/edit their own leave requests through manager dashboard
+### 4. Performance Snapshot
 
-## Workflow Examples
+- Aggregates data from the `latest_performance` view.
+- Displays the average of the latest overall ratings (or performance scores if the rating is missing) and the number of evaluations considered.
+- Refresh button re-computes the average.
 
-### Approving a Leave Request
+## Manager Workflow Examples
 
-1. Navigate to the Leave Requests section at the bottom
-2. Find a pending request (yellow "Pending" badge)
-3. Review the employee name, dates, and reason
-4. Click "Approve" or "Reject" button
-5. Request status updates immediately
-6. Success notification appears
+### A. Approving a Leave Request
 
-### Checking Team Attendance
+1. Scroll to the "Leave Requests" card.
+2. Locate a row with `status = pending`.
+3. Confirm remaining leave balance is adequate.
+4. Click **Approve**: the RPC updates the request and reduces the balance in a single transaction.
+5. Use **Refresh** to verify the status and updated balance.
 
-1. Scroll to the Attendance Tracking section
-2. Use the search box to find a specific employee
-3. Review their recent attendance records
-4. Check total hours worked per day
+### B. Marking Attendance
 
-### Viewing Employee Details
+1. In the "Attendance" card, select an employee and date (defaults to today).
+2. Choose status `Present` or `Absent`.
+3. Click **Save attendance** to upsert the record.
+4. The table refreshes automatically, showing the new or updated entry.
 
-1. Find the employee in the Team Members list
-2. Click "View Profile" button
-3. Review complete information in the dialog:
-   - Personal info (email, phone, DOB, address)
-   - Employment details (position, joining date)
-   - Emergency contacts
-4. Close dialog when done (read-only)
+### C. Reviewing Employee Details
+
+1. In the "Employees" card, click **View Details** for any row.
+2. Review salary, performance, and remaining leave in the dialog.
+3. Close the modal to return to the table.
+
+## Permission Model Recap
+
+- **Employees**: Owner-scoped RLS (can only see/update their own rows across core tables).
+- **Managers/Admins**:
+  - `select` on all HR tables + helper views.
+  - `insert/update` on `attendance_records` for any employee.
+  - `update` on `leave_requests` (enforced through the provided RPCs in practice).
+- RPCs perform role checks using the JWT `role` claim before modifying leave balances.
 
 ## Troubleshooting
 
-### "No team members found"
-- Ensure your employee record has a `department_id` set
-- Check that other employees exist with the same `department_id`
+- **No employees appear**: ensure Supabase JWT includes the `manager` role and that the `employees` table has rows (with `annual_leave_remaining` set).
+- **Attendance save fails**: confirm the unique index `(employee_id, date)` exists and that the authenticated user has the `manager` role claim.
+- **Approve/Reject errors**: verify the manager has an `employees.id` (no null `managerId` on the dashboard) and that the migration granting `authenticated` execute on the RPCs ran successfully.
+- **Performance average is blank**: add at least one row to `performance_evaluations`; the `latest_performance` view surfaces the most recent entry per employee.
 
-### "No recent evaluations"
-- Add performance evaluation records to the database
-- Ensure evaluations have `evaluation_period_end` within the last 7 days
+## Next Enhancements (Optional)
 
-### Can't see leave requests
-- Verify employees in your department have submitted leave requests
-- Check RLS policies are properly applied
-
-### Approve/Reject not working
-- Ensure your employee record exists and has an `id`
-- Check browser console for any error messages
-- Verify Supabase connection is working
-
-## Next Steps
-
-Consider implementing:
-- Email notifications for leave request decisions
-- Persistent announcement system with database storage
-- Export attendance/leave reports to CSV
-- Performance analytics dashboard with charts
-- Real-time updates using Supabase subscriptions
+- Persisted announcements or broadcast messaging.
+- CSV exports for attendance and leave.
+- Realtime updates via Supabase channels.
+- Additional leave types and approval reasoning capture.
+- Deeper analytics (multi-period performance trends, salary progression charts).

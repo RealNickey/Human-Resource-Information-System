@@ -32,6 +32,7 @@ export interface Employee {
   address?: string | null;
   emergency_contact_name?: string | null;
   emergency_contact_phone?: string | null;
+  annual_leave_remaining?: number; // added via 20251014120000 minimal migration
   created_at?: string;
   updated_at?: string;
   department?: Department | null;
@@ -92,6 +93,21 @@ export interface SalaryRecord {
   salary_type: SalaryType;
   currency: string;
   created_at?: string;
+}
+
+// Helper view types (latest_salary, latest_performance)
+export interface LatestSalary {
+  employee_id: number;
+  base_salary: number;
+  currency: string;
+  effective_date: string;
+}
+
+export interface LatestPerformance {
+  employee_id: number;
+  overall_rating?: number | null;
+  performance_score?: number | null;
+  evaluation_period_end: string;
 }
 
 export interface PerformanceEvaluation {

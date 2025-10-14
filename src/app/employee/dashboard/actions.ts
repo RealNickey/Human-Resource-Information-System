@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -31,9 +32,19 @@ export type DeleteLeaveState =
   | { status: "success"; message: string }
   | { status: "error"; message: string };
 
+const departmentIdSchema = z
+  .preprocess((value) => {
+    if (value === "" || value === null || typeof value === "undefined") {
+      return null;
+    }
+
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : value;
+  }, z.number().int().positive().nullable())
+  .optional();
+
 const profileSchema = z.object({
   employee_id: z.coerce.number(),
-  employee_code: z.string().trim().min(1, "Employee ID is required").max(64),
   first_name: z.string().trim().min(1, "First name is required").max(255),
   last_name: z.string().trim().min(1, "Last name is required").max(255),
   date_of_birth: z
@@ -50,10 +61,7 @@ const profileSchema = z.object({
       (value) => !Number.isNaN(new Date(value).getTime()),
       "Provide a valid joining date"
     ),
-  department_id: z
-    .union([z.coerce.number(), z.literal(""), z.null()])
-    .transform((value) => (typeof value === "number" && Number.isFinite(value) ? value : null))
-    .optional(),
+  department_id: departmentIdSchema,
   position: z.string().trim().max(255).optional(),
   phone: z.string().trim().max(255).optional(),
   address: z.string().trim().max(1024).optional(),
@@ -95,7 +103,6 @@ export async function updateEmployeeProfile(
     }
 
     const updates = {
-      employee_id: submission.employee_code,
       first_name: submission.first_name,
       last_name: submission.last_name,
       date_of_birth: submission.date_of_birth || null,
@@ -150,7 +157,6 @@ const leaveSchema = z.object({
 });
 
 const createProfileSchema = z.object({
-  employee_code: z.string().trim().min(1, "Employee ID is required").max(64),
   first_name: z.string().trim().min(1, "First name is required").max(255),
   last_name: z.string().trim().min(1, "Last name is required").max(255),
   date_of_birth: z
@@ -167,10 +173,7 @@ const createProfileSchema = z.object({
       (value) => !Number.isNaN(new Date(value).getTime()),
       "Provide a valid joining date"
     ),
-  department_id: z
-    .union([z.coerce.number(), z.literal(""), z.null()])
-    .transform((value) => (typeof value === "number" && Number.isFinite(value) ? value : null))
-    .optional(),
+  department_id: departmentIdSchema,
   position: z.string().trim().max(255).optional(),
   phone: z.string().trim().max(255).optional(),
   address: z.string().trim().max(1024).optional(),
@@ -185,6 +188,41 @@ const deleteProfileSchema = z.object({
 const deleteLeaveSchema = z.object({
   leave_id: z.coerce.number(),
 });
+
+function generateEmployeeCode(userId: string) {
+  const sanitized = userId.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+  const prefix = sanitized.slice(0, 6) || "USER";
+  const randomSegment = randomUUID()
+    .replace(/-/g, "")
+    .slice(0, 4)
+    .toUpperCase();
+  return `EMP-${prefix}${randomSegment}`;
+}
+
+async function generateUniqueEmployeeCode(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string
+) {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const candidate = generateEmployeeCode(userId);
+    const { data, error } = await supabase
+      .from("employees")
+      .select("id")
+      .eq("employee_id", candidate)
+      .maybeSingle();
+
+    if (error) {
+      console.error("Failed to check employee ID availability", error);
+      break;
+    }
+
+    if (!data) {
+      return candidate;
+    }
+  }
+
+  return `EMP-${randomUUID().replace(/-/g, "").slice(0, 10).toUpperCase()}`;
+}
 
 export async function submitLeaveRequest(
   _prevState: LeaveRequestState,
@@ -218,7 +256,7 @@ export async function submitLeaveRequest(
 
     const { data: employee, error: employeeError } = await supabase
       .from("employees")
-      .select("id, user_id")
+      .select("id, user_id, annual_leave_remaining")
       .eq("id", submission.employee_id)
       .single();
 
@@ -230,6 +268,16 @@ export async function submitLeaveRequest(
       return {
         status: "error",
         message: "You can only request leave for your own account.",
+      };
+    }
+
+    if (
+      typeof employee.annual_leave_remaining === "number" &&
+      daysRequested > employee.annual_leave_remaining
+    ) {
+      return {
+        status: "error",
+        message: `You only have ${employee.annual_leave_remaining} days remaining.`,
       };
     }
 
@@ -306,9 +354,11 @@ export async function createEmployeeProfile(
       };
     }
 
+    const employeeCode = await generateUniqueEmployeeCode(supabase, user.id);
+
     const { error } = await supabase.from("employees").insert({
       user_id: user.id,
-      employee_id: submission.employee_code,
+      employee_id: employeeCode,
       first_name: submission.first_name,
       last_name: submission.last_name,
       email: userEmail,
@@ -326,8 +376,7 @@ export async function createEmployeeProfile(
       console.error("Failed to create employee profile", error);
       return {
         status: "error",
-        message:
-          "Could not create your profile. Choose a different employee ID and try again.",
+        message: "Could not create your profile. Please try again in a moment.",
       };
     }
 
@@ -339,7 +388,10 @@ export async function createEmployeeProfile(
     };
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return { status: "error", message: "Please complete all required fields." };
+      return {
+        status: "error",
+        message: "Please complete all required fields.",
+      };
     }
     console.error("Unexpected error creating employee profile", error);
     return {

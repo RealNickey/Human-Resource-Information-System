@@ -43,33 +43,47 @@ export function EmployeeProfileSetupForm({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base font-semibold">Create your profile</CardTitle>
+        <CardTitle className="text-base font-semibold">
+          Create your profile
+        </CardTitle>
         <CardDescription>
-          Fill in your employment details so the dashboard can track your records.
+          Fill in your employment details so the dashboard can track your
+          records.
         </CardDescription>
       </CardHeader>
       <form className="grid gap-6" action={handleAction}>
         <CardContent className="grid gap-4 md:grid-cols-2">
+          <div className="rounded-md border border-dashed border-muted-foreground/40 bg-muted/20 px-3 py-2 text-sm text-muted-foreground md:col-span-2">
+            Your employee ID is generated automatically after you save your
+            profile.
+          </div>
           <div className="grid gap-2">
-            <Label htmlFor="employee_code">Employee ID</Label>
+            <Label htmlFor="email">Email</Label>
             <Input
-              id="employee_code"
-              name="employee_code"
-              placeholder="e.g. EMP123"
+              id="email"
+              name="email"
+              value={email ?? ""}
+              readOnly
+              disabled
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="first_name">First name</Label>
+            <Input
+              id="first_name"
+              name="first_name"
+              placeholder="First name"
               required
             />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" name="email" value={email ?? ""} readOnly disabled />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="first_name">First name</Label>
-            <Input id="first_name" name="first_name" placeholder="First name" required />
-          </div>
-          <div className="grid gap-2">
             <Label htmlFor="last_name">Last name</Label>
-            <Input id="last_name" name="last_name" placeholder="Last name" required />
+            <Input
+              id="last_name"
+              name="last_name"
+              placeholder="Last name"
+              required
+            />
           </div>
           <div className="grid gap-2">
             <Label htmlFor="date_of_birth">Date of birth</Label>
@@ -102,7 +116,11 @@ export function EmployeeProfileSetupForm({
           </div>
           <div className="grid gap-2">
             <Label htmlFor="position">Position</Label>
-            <Input id="position" name="position" placeholder="e.g. Software Engineer" />
+            <Input
+              id="position"
+              name="position"
+              placeholder="e.g. Software Engineer"
+            />
           </div>
           <div className="grid gap-2">
             <Label htmlFor="phone">Phone number</Label>
@@ -132,7 +150,9 @@ export function EmployeeProfileSetupForm({
         <CardFooter className="flex items-center justify-between border-t pt-4">
           <StatusMessage state={state} />
           <Button type="submit" disabled={isPending}>
-            {isPending ? <IconLoader className="mr-2 size-4 animate-spin" /> : null}
+            {isPending ? (
+              <IconLoader className="mr-2 size-4 animate-spin" />
+            ) : null}
             Save profile
           </Button>
         </CardFooter>
@@ -156,6 +176,8 @@ function StatusMessage({ state }: { state: CreateProfileState }) {
   }
 
   return (
-    <p className="text-xs text-muted-foreground">All fields can be updated later.</p>
+    <p className="text-xs text-muted-foreground">
+      All fields can be updated later.
+    </p>
   );
 }

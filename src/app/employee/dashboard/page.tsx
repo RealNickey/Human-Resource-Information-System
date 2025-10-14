@@ -45,6 +45,7 @@ export default async function EmployeeDashboard() {
         address,
         emergency_contact_name,
         emergency_contact_phone,
+        annual_leave_remaining,
         department:departments(id,name,description)
       `
     )
@@ -57,8 +58,15 @@ export default async function EmployeeDashboard() {
     .select("id, name")
     .order("name", { ascending: true });
 
-  const departments = (departmentData as Array<Pick<Department, "id" | "name">>) ?? [];
-  const summary = employee ? await buildEmployeeSummary(supabase, employee.id) : null;
+  const departments =
+    (departmentData as Array<Pick<Department, "id" | "name">>) ?? [];
+  const summary = employee
+    ? await buildEmployeeSummary(
+        supabase,
+        employee.id,
+        employee.annual_leave_remaining ?? null
+      )
+    : null;
   const userEmail = data.claims.email as string | null | undefined;
 
   return (
@@ -67,14 +75,17 @@ export default async function EmployeeDashboard() {
         <header className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <div className="flex flex-col gap-2">
-              <p className="text-sm font-medium text-muted-foreground">Employee Dashboard</p>
+              <p className="text-sm font-medium text-muted-foreground">
+                Employee Dashboard
+              </p>
               <h1 className="text-3xl font-semibold tracking-tight text-foreground">
                 {employee
                   ? `Welcome back, ${employee.first_name} ${employee.last_name}`
                   : "Complete your employee profile"}
               </h1>
               <p className="text-sm text-muted-foreground">
-                Review your personal details, track attendance and leave, monitor salary changes, and keep your profile up to date.
+                Review your personal details, track attendance and leave,
+                monitor salary changes, and keep your profile up to date.
               </p>
             </div>
             <LogoutButton />
@@ -89,7 +100,10 @@ export default async function EmployeeDashboard() {
 
             <section className="grid gap-6 lg:grid-cols-2">
               <AttendanceSummary employeeId={employee.id} />
-              <LeaveManagement employeeId={employee.id} />
+              <LeaveManagement
+                employeeId={employee.id}
+                remainingLeave={employee.annual_leave_remaining ?? undefined}
+              />
             </section>
 
             <SalaryInformation employeeId={employee.id} />
@@ -97,7 +111,10 @@ export default async function EmployeeDashboard() {
             <ProfileUpdateForm employee={employee} departments={departments} />
           </>
         ) : (
-          <EmployeeProfileSetupForm email={userEmail} departments={departments} />
+          <EmployeeProfileSetupForm
+            email={userEmail}
+            departments={departments}
+          />
         )}
       </div>
     </main>
@@ -116,11 +133,16 @@ type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 
 async function buildEmployeeSummary(
   supabase: SupabaseServerClient,
-  employeeId: number
+  employeeId: number,
+  initialRemaining: number | null
 ): Promise<EmployeeDashboardSummaryData> {
   const now = new Date();
-  const monthStartIso = toIsoDate(new Date(now.getFullYear(), now.getMonth(), 1));
-  const nextMonthStartIso = toIsoDate(new Date(now.getFullYear(), now.getMonth() + 1, 1));
+  const monthStartIso = toIsoDate(
+    new Date(now.getFullYear(), now.getMonth(), 1)
+  );
+  const nextMonthStartIso = toIsoDate(
+    new Date(now.getFullYear(), now.getMonth() + 1, 1)
+  );
   const yearStartIso = toIsoDate(new Date(now.getFullYear(), 0, 1));
   const nextYearStartIso = toIsoDate(new Date(now.getFullYear() + 1, 0, 1));
 
@@ -160,7 +182,11 @@ async function buildEmployeeSummary(
     0
   );
 
-  const leavesRemaining = Math.max(ANNUAL_LEAVE_ALLOWANCE - leaveDaysTakenThisYear, 0);
+  const computedRemaining = Math.max(
+    ANNUAL_LEAVE_ALLOWANCE - leaveDaysTakenThisYear,
+    0
+  );
+  const leavesRemaining = initialRemaining ?? computedRemaining;
   const nextPayday = calculateNextPayday(now);
 
   return {
@@ -193,7 +219,11 @@ function calculateNextPayday(reference: Date) {
   payday.setHours(0, 0, 0, 0);
 
   if (payday <= current) {
-    const nextMonth = new Date(current.getFullYear(), current.getMonth() + 1, 1);
+    const nextMonth = new Date(
+      current.getFullYear(),
+      current.getMonth() + 1,
+      1
+    );
     const nextMonthDays = new Date(
       nextMonth.getFullYear(),
       nextMonth.getMonth() + 1,
