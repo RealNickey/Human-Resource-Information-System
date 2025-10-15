@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { IconCalendar, IconRefresh } from "@tabler/icons-react";
+import { IconRefresh } from "@tabler/icons-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -272,16 +272,21 @@ export function ManagerAttendanceTracking() {
           </div>
           <div>
             <Label htmlFor="attendance-date">Date</Label>
-            <div className="relative">
-              <IconCalendar className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                id="attendance-date"
-                type="date"
-                value={selectedDate}
-                onChange={(event) => setSelectedDate(event.target.value)}
-                className="pl-9"
-              />
-            </div>
+            <DatePicker
+              id="attendance-date"
+              value={(() => {
+                const parsed = new Date(selectedDate);
+                return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+              })()}
+              onChange={(date) => {
+                if (date) {
+                  setSelectedDate(toIsoDate(date));
+                }
+              }}
+              fromDate={subtractDays(today, 365)}
+              toDate={today}
+              className="w-full"
+            />
           </div>
           <div>
             <Label htmlFor="attendance-status">Status</Label>
@@ -313,32 +318,52 @@ export function ManagerAttendanceTracking() {
         <section className="grid gap-4 rounded-md border p-4 md:grid-cols-4">
           <div>
             <Label htmlFor="attendance-from">From</Label>
-            <Input
+            <DatePicker
               id="attendance-from"
-              type="date"
-              value={dateRange.from}
-              max={dateRange.to}
-              onChange={(event) =>
+              value={(() => {
+                const parsed = new Date(dateRange.from);
+                return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+              })()}
+              onChange={(date) => {
+                if (!date) return;
+                const next = toIsoDate(date);
                 setDateRange((current) => ({
                   ...current,
-                  from: event.target.value,
-                }))
+                  from: next,
+                  to:
+                    new Date(current.to) < date ? toIsoDate(date) : current.to,
+                }));
+              }}
+              toDate={
+                (() => {
+                  const parsed = new Date(dateRange.to);
+                  return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+                })() ?? today
               }
+              className="w-full"
             />
           </div>
           <div>
             <Label htmlFor="attendance-to">To</Label>
-            <Input
+            <DatePicker
               id="attendance-to"
-              type="date"
-              value={dateRange.to}
-              min={dateRange.from}
-              onChange={(event) =>
+              value={(() => {
+                const parsed = new Date(dateRange.to);
+                return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+              })()}
+              onChange={(date) => {
+                if (!date) return;
                 setDateRange((current) => ({
                   ...current,
-                  to: event.target.value,
-                }))
-              }
+                  to: toIsoDate(date),
+                }));
+              }}
+              fromDate={(() => {
+                const parsed = new Date(dateRange.from);
+                return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+              })()}
+              toDate={today}
+              className="w-full"
             />
           </div>
           <div className="md:col-span-2 flex items-end text-sm text-muted-foreground">
