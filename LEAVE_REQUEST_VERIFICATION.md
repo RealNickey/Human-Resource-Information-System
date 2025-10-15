@@ -46,7 +46,7 @@ The employee leave page (`/employee/dashboard/leave`) displays two main sections
 - Form to submit new leave requests
 - Shows **only pending and rejected** leave requests for the current year (last 5)
 - Displays: dates, type, days, and status with color-coded badges
-  - Pending: Amber/yellow badge
+  - Pending: Amber badge
   - Rejected: Red badge
 - Shows available leave balance at the top
 - Updates automatically when:
@@ -77,13 +77,13 @@ The employee leave page (`/employee/dashboard/leave`) displays two main sections
 **Implementation Location**: `src/components/ui/date-picker.tsx`
 
 **Verification**:
-- The `DatePicker` component imports `Calendar` from `@/components/ui/calendar` (line 9)
-- The `Calendar` component from `calendar.tsx` is rendered inside a popover (lines 65-76)
+- The `DatePicker` component imports `Calendar` from `@/components/ui/calendar`
+- The `Calendar` component from `calendar.tsx` is rendered inside a popover
 - The Calendar component uses the `react-day-picker` library with custom styling
 - The DatePicker wrapper provides:
   - Popover trigger with calendar icon
-  - Date formatting display
-  - Hidden input for form submission
+  - Date formatting display (format: "Month Day, Year", e.g., "January 1, 2024")
+  - Hidden input for form submission (format: "yyyy-MM-dd")
   - Date range constraints (fromDate, toDate)
 
 **Used In**:
@@ -120,7 +120,7 @@ The employee leave page (`/employee/dashboard/leave`) displays two main sections
 ## Build Verification
 
 ✅ Build successful: `npm run build` completed without errors
-✅ Lint check passed: Only 2 pre-existing warnings (unrelated to changes)
+✅ Lint check passed: Only pre-existing warnings (unrelated to these changes)
 ✅ TypeScript compilation: No type errors
 ✅ All routes compiled successfully
 
