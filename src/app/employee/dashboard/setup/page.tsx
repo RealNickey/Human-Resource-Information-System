@@ -5,10 +5,6 @@ import { LogoutButton } from "@/components/logout-button";
 import { createClient } from "@/lib/server";
 import { UserRole } from "@/lib/types";
 
-// Disable caching to prevent redirect loops
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
 export default async function EmployeeProfileSetup() {
   const supabase = await createClient();
 
@@ -19,7 +15,7 @@ export default async function EmployeeProfileSetup() {
   }
 
   const userRole = data.claims.user_metadata?.role as UserRole | undefined;
-
+  
   // Only employees and managers can access this page
   if (!userRole || !["employee", "manager"].includes(userRole)) {
     redirect("/protected");

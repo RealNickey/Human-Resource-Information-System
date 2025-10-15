@@ -413,9 +413,8 @@ export async function createEmployeeProfile(
     };
   }
 
-  // Success - revalidate all dashboard paths and redirect
-  revalidatePath("/employee/dashboard", "layout");
-  revalidatePath("/employee/dashboard/setup");
+  // Success - redirect to overview (this throws and never returns)
+  revalidatePath("/employee/dashboard");
   revalidatePath("/employee/dashboard/overview");
   redirect("/employee/dashboard/overview");
 }

@@ -25,10 +25,6 @@ import { createClient } from "@/lib/server";
 import { Employee, UserRole } from "@/lib/types";
 import { ANNUAL_LEAVE_ALLOWANCE } from "@/lib/constants";
 
-// Disable caching to prevent redirect loops
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
 export default async function EmployeeDashboardOverview() {
   const supabase = await createClient();
 
@@ -42,12 +38,7 @@ export default async function EmployeeDashboardOverview() {
     redirect("/protected");
   }
 
-  // Verify auth session
-  const {
-    data: { user: authUser },
-  } = await supabase.auth.getUser();
-
-  const { data: employeeData, error: fetchError } = await supabase
+  const { data: employeeRecord, error: employeeError } = await supabase
     .from("employees")
     .select(
       `
@@ -65,19 +56,63 @@ export default async function EmployeeDashboardOverview() {
         address,
         emergency_contact_name,
         emergency_contact_phone,
-        annual_leave_remaining,
-        department:departments(id,name,description)
+        annual_leave_remaining
       `
     )
     .eq("user_id", data.claims.sub)
     .maybeSingle();
 
-  const employee = (employeeData as Employee | null) ?? null;
+  if (employeeError) {
+    console.error("Failed to load employee profile", employeeError);
 
-  // If no employee profile exists, redirect to setup page
-  if (!employee) {
+    return (
+      <main className="min-h-screen bg-muted/20 py-10">
+        <div className="mx-auto flex max-w-2xl flex-col gap-6 px-4 sm:px-6">
+          <div className="flex justify-end">
+            <LogoutButton />
+          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Profile Not Available</CardTitle>
+              <CardDescription>
+                We couldn&apos;t load your employee profile at the moment
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Please try again shortly or contact support if the issue
+                persists. No data was lost.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </main>
+    );
+  }
+
+  if (!employeeRecord) {
     redirect("/employee/dashboard/setup");
   }
+
+  let department: Employee["department"] = null;
+  if (employeeRecord.department_id) {
+    const { data: departmentData, error: departmentError } = await supabase
+      .from("departments")
+      .select("id, name, description")
+      .eq("id", employeeRecord.department_id)
+      .maybeSingle();
+
+    if (departmentError) {
+      console.error("Failed to load department details", departmentError);
+    } else if (departmentData) {
+      department = departmentData as Employee["department"];
+    }
+  }
+
+  const employee: Employee = {
+    ...employeeRecord,
+    department,
+  };
 
   const summary = await buildEmployeeSummary(
     supabase,
