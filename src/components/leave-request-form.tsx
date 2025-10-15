@@ -18,11 +18,10 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -77,6 +76,8 @@ export function LeaveRequestForm({
   const [isLoading, setIsLoading] = useState(true);
   const [state, setState] = useState<LeaveRequestState>({ status: "idle" });
   const [isPending, startTransition] = useTransition();
+  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
+  const [endDate, setEndDate] = useState<Date | undefined>(undefined);
 
   const loadLeaveRequests = useCallback(async () => {
     if (!employeeId) {
@@ -156,7 +157,9 @@ export function LeaveRequestForm({
       setState(result);
       if (result.status === "success") {
         await loadLeaveRequests();
-        // Clear form
+        // Clear form and dates
+        setStartDate(undefined);
+        setEndDate(undefined);
         const form = document.querySelector("form") as HTMLFormElement;
         if (form) {
           form.reset();
@@ -217,23 +220,27 @@ export function LeaveRequestForm({
 
             <div>
               <Label htmlFor="start_date">From Date</Label>
-              <Input
+              <DatePicker
                 id="start_date"
                 name="start_date"
-                type="date"
+                value={startDate}
+                onChange={setStartDate}
+                placeholder="Select start date"
                 required
-                min={new Date().toISOString().split("T")[0]}
+                fromDate={new Date()}
               />
             </div>
 
             <div>
               <Label htmlFor="end_date">To Date</Label>
-              <Input
+              <DatePicker
                 id="end_date"
                 name="end_date"
-                type="date"
+                value={endDate}
+                onChange={setEndDate}
+                placeholder="Select end date"
                 required
-                min={new Date().toISOString().split("T")[0]}
+                fromDate={startDate || new Date()}
               />
             </div>
 

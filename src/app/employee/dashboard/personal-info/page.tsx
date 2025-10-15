@@ -1,11 +1,15 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
+import { IconArrowLeft } from "@tabler/icons-react";
 
-import { EmployeeProfileSetupForm } from "@/components/employee-profile-setup-form";
+import { EmployeePersonalInfo } from "@/components/employee-personal-info";
+import { ProfileUpdateForm } from "@/components/profile-update-form";
 import { LogoutButton } from "@/components/logout-button";
+import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/server";
-import { Department, Employee, UserRole } from "@/lib/types";
+import { Employee, Department, UserRole } from "@/lib/types";
 
-export default async function EmployeeDashboard() {
+export default async function PersonalInfoPage() {
   const supabase = await createClient();
 
   const { data, error } = await supabase.auth.getClaims();
@@ -45,9 +49,8 @@ export default async function EmployeeDashboard() {
 
   const employee = (employeeData as Employee | null) ?? null;
 
-  // If employee profile exists, redirect to overview dashboard
-  if (employee) {
-    redirect("/employee/dashboard/overview");
+  if (!employee) {
+    redirect("/employee/dashboard");
   }
 
   const { data: departmentData } = await supabase
@@ -57,7 +60,6 @@ export default async function EmployeeDashboard() {
 
   const departments =
     (departmentData as Array<Pick<Department, "id" | "name">>) ?? [];
-  const userEmail = data.claims.email as string | null | undefined;
 
   return (
     <main className="min-h-screen bg-muted/20 py-10">
@@ -65,22 +67,39 @@ export default async function EmployeeDashboard() {
         <header className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <div className="flex flex-col gap-2">
-              <p className="text-sm font-medium text-muted-foreground">
-                Employee Dashboard
-              </p>
+              <Button asChild variant="ghost" size="sm" className="w-fit -ml-2">
+                <Link href="/employee/dashboard/overview">
+                  <IconArrowLeft className="mr-2 h-4 w-4" />
+                  Back to Dashboard
+                </Link>
+              </Button>
               <h1 className="text-3xl font-semibold tracking-tight text-foreground">
-                Complete your employee profile
+                📋 Personal Information
               </h1>
               <p className="text-sm text-muted-foreground">
-                Set up your profile to access your personalized dashboard with
-                attendance tracking, leave management, and salary information.
+                View and manage your personal details, contact information, and
+                emergency contacts.
               </p>
             </div>
             <LogoutButton />
           </div>
         </header>
 
-        <EmployeeProfileSetupForm email={userEmail} departments={departments} />
+        {/* Personal Information Display */}
+        <section>
+          <h2 className="text-lg font-semibold text-foreground mb-3">
+            Current Information
+          </h2>
+          <EmployeePersonalInfo employee={employee} />
+        </section>
+
+        {/* Profile Update Form */}
+        <section>
+          <h2 className="text-lg font-semibold text-foreground mb-3">
+            Update Profile
+          </h2>
+          <ProfileUpdateForm employee={employee} departments={departments} />
+        </section>
       </div>
     </main>
   );

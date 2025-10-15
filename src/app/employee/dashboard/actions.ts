@@ -35,13 +35,15 @@ export type DeleteLeaveState =
 
 const departmentIdSchema = z
   .preprocess((value) => {
+    // Handle null, undefined, or empty string
     if (value === "" || value === null || typeof value === "undefined") {
-      return null;
+      return undefined;
     }
 
+    // Try to parse as number
     const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : value;
-  }, z.number().int().positive().nullable())
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }, z.number().int().positive().optional())
   .optional();
 
 const profileSchema = z.object({
@@ -358,10 +360,9 @@ export async function createEmployeeProfile(
       .maybeSingle();
 
     if (existing) {
-      return {
-        status: "error",
-        message: "You already have an employee profile.",
-      };
+      revalidatePath("/employee/dashboard");
+      revalidatePath("/employee/dashboard/overview");
+      redirect("/employee/dashboard/overview");
     }
 
     const employeeCode = await generateUniqueEmployeeCode(supabase, user.id);
@@ -391,7 +392,8 @@ export async function createEmployeeProfile(
     }
 
     revalidatePath("/employee/dashboard");
-    redirect("/employee/dashboard");
+    revalidatePath("/employee/dashboard/overview");
+    redirect("/employee/dashboard/overview");
   } catch (error) {
     if (error instanceof z.ZodError) {
       const firstError = error.issues[0];
