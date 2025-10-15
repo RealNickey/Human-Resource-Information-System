@@ -65,32 +65,93 @@ export function EmployeePersonalInfo({ employee }: EmployeePersonalInfoProps) {
           </div>
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <dl className="grid gap-6 md:grid-cols-2">
-          <div>
-            <dt className="text-xs uppercase text-muted-foreground">Employee ID</dt>
-            <dd className="font-mono text-sm">{employee.employee_id}</dd>
-          </div>
-          <div>
-            <dt className="text-xs uppercase text-muted-foreground">Department</dt>
-            <dd className="text-sm">
-              {employee.department?.name ?? "Not assigned"}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs uppercase text-muted-foreground">Email</dt>
-            <dd className="text-sm">{employee.email}</dd>
-          </div>
-          <div>
-            <dt className="text-xs uppercase text-muted-foreground">Date of Birth</dt>
-            <dd className="text-sm">{formatDate(employee.date_of_birth)}</dd>
-          </div>
-          <div>
-            <dt className="text-xs uppercase text-muted-foreground">Date of Joining</dt>
-            <dd className="text-sm">{formatDate(employee.date_of_joining)}</dd>
-          </div>
-        </dl>
+      <CardContent className="space-y-8">
+        <section>
+          <h3 className="text-sm font-semibold text-muted-foreground mb-3">
+            Employment Details
+          </h3>
+          <dl className="grid gap-4 md:grid-cols-2">
+            <InfoItem label="Employee ID" value={employee.employee_id} isMono />
+            <InfoItem
+              label="Department"
+              value={employee.department?.name ?? "Not assigned"}
+            />
+            <InfoItem
+              label="Position"
+              value={employee.position || "Not specified"}
+            />
+            <InfoItem
+              label="Date of Joining"
+              value={formatDate(employee.date_of_joining)}
+            />
+            <InfoItem
+              label="Date of Birth"
+              value={formatDate(employee.date_of_birth)}
+            />
+            <InfoItem
+              label="Annual Leave Remaining"
+              value={
+                typeof employee.annual_leave_remaining === "number"
+                  ? `${employee.annual_leave_remaining} days`
+                  : "—"
+              }
+            />
+          </dl>
+        </section>
+
+        <section>
+          <h3 className="text-sm font-semibold text-muted-foreground mb-3">
+            Contact Information
+          </h3>
+          <dl className="grid gap-4 md:grid-cols-2">
+            <InfoItem label="Email" value={employee.email} />
+            <InfoItem label="Phone" value={employee.phone || "Not provided"} />
+            <InfoItem
+              label="Address"
+              value={employee.address || "Not provided"}
+              className="md:col-span-2 whitespace-pre-line"
+            />
+          </dl>
+        </section>
+
+        <section>
+          <h3 className="text-sm font-semibold text-muted-foreground mb-3">
+            Emergency Contact
+          </h3>
+          <dl className="grid gap-4 md:grid-cols-2">
+            <InfoItem
+              label="Name"
+              value={employee.emergency_contact_name || "Not provided"}
+            />
+            <InfoItem
+              label="Phone"
+              value={employee.emergency_contact_phone || "Not provided"}
+            />
+          </dl>
+        </section>
       </CardContent>
     </Card>
+  );
+}
+
+interface InfoItemProps {
+  label: string;
+  value: string;
+  isMono?: boolean;
+  className?: string;
+}
+
+function InfoItem({ label, value, isMono = false, className }: InfoItemProps) {
+  return (
+    <div className={className}>
+      <dt className="text-xs uppercase text-muted-foreground tracking-wide">
+        {label}
+      </dt>
+      <dd
+        className={isMono ? "font-mono text-sm" : "text-sm text-foreground"}
+      >
+        {value || "—"}
+      </dd>
+    </div>
   );
 }

@@ -6,6 +6,7 @@ import { EmployeePersonalInfo } from "@/components/employee-personal-info";
 import { ProfileUpdateForm } from "@/components/profile-update-form";
 import { LogoutButton } from "@/components/logout-button";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/lib/server";
 import { Employee, Department, UserRole } from "@/lib/types";
 
@@ -22,7 +23,7 @@ export default async function PersonalInfoPage() {
     redirect("/protected");
   }
 
-  const { data: employeeData } = await supabase
+  const { data: employeeRecord, error: employeeError } = await supabase
     .from("employees")
     .select(
       `
@@ -40,18 +41,59 @@ export default async function PersonalInfoPage() {
         address,
         emergency_contact_name,
         emergency_contact_phone,
-        annual_leave_remaining,
-        department:departments(id,name,description)
+        annual_leave_remaining
       `
     )
     .eq("user_id", data.claims.sub)
     .maybeSingle();
 
-  const employee = (employeeData as Employee | null) ?? null;
-
-  if (!employee) {
-    redirect("/employee/dashboard");
+  if (employeeError) {
+    console.error("Failed to load personal info", employeeError);
+    return (
+      <main className="min-h-screen bg-muted/20 py-10">
+        <div className="mx-auto flex max-w-2xl flex-col gap-6 px-4 sm:px-6">
+          <div className="flex justify-end">
+            <LogoutButton />
+          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Unable to load your profile</CardTitle>
+              <CardDescription>
+                We couldn&apos;t fetch your personal information right now.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm text-muted-foreground">
+              <p>Please refresh the page in a moment. If this continues, contact support.</p>
+            </CardContent>
+          </Card>
+        </div>
+      </main>
+    );
   }
+
+  if (!employeeRecord) {
+    redirect("/employee/dashboard/setup");
+  }
+
+  let department: Employee["department"] = null;
+  if (employeeRecord.department_id) {
+    const { data: departmentResult, error: departmentError } = await supabase
+      .from("departments")
+      .select("id, name, description")
+      .eq("id", employeeRecord.department_id)
+      .maybeSingle();
+
+    if (departmentError) {
+      console.error("Failed to load department for profile", departmentError);
+    } else if (departmentResult) {
+      department = departmentResult as Employee["department"];
+    }
+  }
+
+  const employee: Employee = {
+    ...employeeRecord,
+    department,
+  };
 
   const { data: departmentData } = await supabase
     .from("departments")

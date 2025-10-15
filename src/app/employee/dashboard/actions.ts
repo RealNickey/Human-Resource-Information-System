@@ -129,7 +129,8 @@ export async function updateEmployeeProfile(
       return { status: "error", message: "Could not save your changes." };
     }
 
-    revalidatePath("/employee/dashboard");
+  revalidatePath("/employee/dashboard");
+  revalidatePath("/employee/dashboard/personal-info");
 
     return { status: "success", message: "Profile updated successfully." };
   } catch (error) {
@@ -299,7 +300,8 @@ export async function submitLeaveRequest(
       return { status: "error", message: "Could not submit your request." };
     }
 
-    revalidatePath("/employee/dashboard");
+  revalidatePath("/employee/dashboard");
+  revalidatePath("/employee/dashboard/personal-info");
 
     return {
       status: "success",
@@ -416,6 +418,7 @@ export async function createEmployeeProfile(
   // Success - redirect to overview (this throws and never returns)
   revalidatePath("/employee/dashboard");
   revalidatePath("/employee/dashboard/overview");
+  revalidatePath("/employee/dashboard/personal-info");
   redirect("/employee/dashboard/overview");
 }
 

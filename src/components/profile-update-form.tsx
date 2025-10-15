@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
   IconCircleCheckFilled,
   IconLoader,
@@ -55,6 +56,7 @@ export function ProfileUpdateForm({
   employee,
   departments,
 }: ProfileUpdateFormProps) {
+  const router = useRouter();
   const [state, setState] = useState<UpdateProfileState>({ status: "idle" });
   const [deleteState, setDeleteState] = useState<DeleteProfileState>({
     status: "idle",
@@ -144,6 +146,9 @@ export function ProfileUpdateForm({
     startTransition(async () => {
       const result = await updateEmployeeProfile(state, nativeFormData);
       setState(result);
+      if (result.status === "success") {
+        router.refresh();
+      }
       // On error, form data is preserved via state
     });
   }
@@ -152,6 +157,9 @@ export function ProfileUpdateForm({
     startDeleteTransition(async () => {
       const result = await deleteEmployeeProfile(deleteState, nativeFormData);
       setDeleteState(result);
+      if (result.status === "success") {
+        router.refresh();
+      }
     });
   }
 
