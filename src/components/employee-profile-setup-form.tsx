@@ -23,7 +23,7 @@ import { Department } from "@/lib/types";
 
 interface EmployeeProfileSetupFormProps {
   email: string | null | undefined;
-  departments: Array<Pick<Department, "id" | "name">>;
+  departments?: Array<Pick<Department, "id" | "name">>;
 }
 
 export function EmployeeProfileSetupForm({
@@ -107,20 +107,27 @@ export function EmployeeProfileSetupForm({
               className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               <option value="">Select department</option>
-              {departments.map((department) => (
-                <option key={department.id} value={department.id}>
-                  {department.name}
-                </option>
-              ))}
+              {departments && departments.length ? (
+                departments.map((department) => (
+                  <option key={department.id} value={department.id}>
+                    {department.name}
+                  </option>
+                ))
+              ) : (
+                // Fallback departments requested: Sales, HR, IT, Marketing, Customer Support
+                [
+                  "Sales",
+                  "HR",
+                  "IT",
+                  "Marketing",
+                  "Customer Support",
+                ].map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))
+              )}
             </select>
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="position">Position</Label>
-            <Input
-              id="position"
-              name="position"
-              placeholder="e.g. Software Engineer"
-            />
           </div>
           <div className="grid gap-2">
             <Label htmlFor="phone">Phone number</Label>
