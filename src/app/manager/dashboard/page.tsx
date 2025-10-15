@@ -46,7 +46,7 @@ export default async function ManagerDashboard() {
                   : "Manager Dashboard"}
               </h1>
               <p className="text-sm text-muted-foreground">
-                Manage your team, track performance, and approve leave requests.
+                Manage your team, track attendance, and approve leave requests.
               </p>
             </div>
             <LogoutButton />
