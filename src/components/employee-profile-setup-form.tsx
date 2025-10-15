@@ -44,18 +44,25 @@ export function EmployeeProfileSetupForm({
     <Card>
       <CardHeader>
         <CardTitle className="text-base font-semibold">
-          Create your profile
+          Welcome! Let's set up your employee profile
         </CardTitle>
         <CardDescription>
-          Fill in your employment details so the dashboard can track your
-          records.
+          Complete your profile to access your personalized dashboard with attendance tracking,
+          leave management, and salary information. All fields can be updated later.
         </CardDescription>
       </CardHeader>
       <form className="grid gap-6" action={handleAction}>
         <CardContent className="grid gap-4 md:grid-cols-2">
-          <div className="rounded-md border border-dashed border-muted-foreground/40 bg-muted/20 px-3 py-2 text-sm text-muted-foreground md:col-span-2">
-            Your employee ID is generated automatically after you save your
-            profile.
+          <div className="rounded-md border border-dashed border-emerald-600/40 bg-emerald-50 dark:bg-emerald-950/20 px-4 py-3 text-sm md:col-span-2">
+            <p className="font-medium text-emerald-900 dark:text-emerald-100 mb-1">
+              📋 What happens after you submit?
+            </p>
+            <ul className="text-emerald-800 dark:text-emerald-200 space-y-1 ml-4 list-disc">
+              <li>Your unique employee ID will be generated automatically</li>
+              <li>You'll be redirected to your full employee dashboard</li>
+              <li>You can immediately view attendance, request leave, and check salary info</li>
+              <li>All information can be updated anytime from your profile settings</li>
+            </ul>
           </div>
           <div className="grid gap-2">
             <Label htmlFor="email">Email</Label>
@@ -155,12 +162,16 @@ export function EmployeeProfileSetupForm({
           </div>
         </CardContent>
         <CardFooter className="flex items-center justify-between border-t pt-4">
-          <StatusMessage state={state} />
-          <Button type="submit" disabled={isPending}>
+          <StatusMessage state={state} isPending={isPending} />
+          <Button type="submit" disabled={isPending} size="lg">
             {isPending ? (
-              <IconLoader className="mr-2 size-4 animate-spin" />
-            ) : null}
-            Save profile
+              <>
+                <IconLoader className="mr-2 size-4 animate-spin" />
+                Creating your profile...
+              </>
+            ) : (
+              "Complete Setup & Access Dashboard"
+            )}
           </Button>
         </CardFooter>
       </form>
@@ -168,23 +179,42 @@ export function EmployeeProfileSetupForm({
   );
 }
 
-function StatusMessage({ state }: { state: CreateProfileState }) {
+function StatusMessage({ 
+  state, 
+  isPending 
+}: { 
+  state: CreateProfileState;
+  isPending: boolean;
+}) {
   if (state.status === "success") {
     return (
-      <p className="flex items-center gap-2 text-sm text-emerald-600">
+      <p className="flex items-center gap-2 text-sm text-emerald-600 font-medium">
         <IconCircleCheckFilled className="size-4" />
-        {state.message}
+        {state.message} Redirecting to dashboard...
       </p>
     );
   }
 
   if (state.status === "error") {
-    return <p className="text-sm text-rose-600">{state.message}</p>;
+    return (
+      <p className="text-sm text-rose-600 font-medium">
+        ⚠️ {state.message}
+      </p>
+    );
+  }
+
+  if (isPending) {
+    return (
+      <p className="text-sm text-muted-foreground flex items-center gap-2">
+        <IconLoader className="size-4 animate-spin" />
+        Setting up your profile...
+      </p>
+    );
   }
 
   return (
     <p className="text-xs text-muted-foreground">
-      All fields can be updated later.
+      Required fields: First name, Last name, Date of joining
     </p>
   );
 }

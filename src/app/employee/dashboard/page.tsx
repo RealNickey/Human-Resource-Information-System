@@ -7,7 +7,8 @@ import {
 } from "@/components/employee-dashboard-summary";
 import { EmployeeProfileSetupForm } from "@/components/employee-profile-setup-form";
 import { EmployeePersonalInfo } from "@/components/employee-personal-info";
-import { LeaveManagement } from "@/components/leave-management";
+import { LeaveHistory } from "@/components/leave-history";
+import { LeaveRequestForm } from "@/components/leave-request-form";
 import { LogoutButton } from "@/components/logout-button";
 import { ProfileUpdateForm } from "@/components/profile-update-form";
 import { SalaryInformation } from "@/components/salary-information";
@@ -95,21 +96,57 @@ export default async function EmployeeDashboard() {
 
         {employee ? (
           <>
+            {/* Dashboard Summary */}
             <EmployeeDashboardSummary data={summary} isLoading={!employee} />
 
-            <EmployeePersonalInfo employee={employee} />
-
-            <section className="grid gap-6 lg:grid-cols-2">
-              <AttendanceSummary employeeId={employee.id} />
-              <LeaveManagement
-                employeeId={employee.id}
-                remainingLeave={employee.annual_leave_remaining ?? undefined}
-              />
+            {/* Section 1: Personal Information */}
+            <section>
+              <h2 className="text-lg font-semibold text-foreground mb-3">
+                📋 Personal Information
+              </h2>
+              <EmployeePersonalInfo employee={employee} />
             </section>
 
-            <SalaryInformation employeeId={employee.id} />
+            {/* Section 2: Attendance Tracker */}
+            <section>
+              <h2 className="text-lg font-semibold text-foreground mb-3">
+                📊 Attendance Tracker
+              </h2>
+              <AttendanceSummary employeeId={employee.id} />
+            </section>
 
-            <ProfileUpdateForm employee={employee} departments={departments} />
+            {/* Section 3: Leave Management */}
+            <section>
+              <h2 className="text-lg font-semibold text-foreground mb-3">
+                🏖️ Leave Management
+              </h2>
+              <div className="grid gap-6 lg:grid-cols-2">
+                {/* Leave History: Dates taken */}
+                <LeaveHistory employeeId={employee.id} />
+
+                {/* Request Time Off Form */}
+                <LeaveRequestForm
+                  employeeId={employee.id}
+                  remainingLeave={employee.annual_leave_remaining ?? undefined}
+                />
+              </div>
+            </section>
+
+            {/* Section 4: Salary Information */}
+            <section>
+              <h2 className="text-lg font-semibold text-foreground mb-3">
+                💰 Salary Information
+              </h2>
+              <SalaryInformation employeeId={employee.id} />
+            </section>
+
+            {/* Profile Update Form */}
+            <section>
+              <h2 className="text-lg font-semibold text-foreground mb-3">
+                ⚙️ Update Profile
+              </h2>
+              <ProfileUpdateForm employee={employee} departments={departments} />
+            </section>
           </>
         ) : (
           <EmployeeProfileSetupForm
