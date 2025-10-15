@@ -4,7 +4,6 @@ import { LogoutButton } from "@/components/logout-button";
 import { ManagerAttendanceTracking } from "@/components/manager-attendance-tracking";
 import { ManagerLeaveRequests } from "@/components/manager-leave-requests";
 import { TeamEmployees } from "@/components/team-employees";
-import { TeamPerformance } from "@/components/team-performance";
 import { createClient } from "@/lib/server";
 import { Employee, UserRole } from "@/lib/types";
 
@@ -53,8 +52,6 @@ export default async function ManagerDashboard() {
             <LogoutButton />
           </div>
         </header>
-
-        <TeamPerformance />
 
         <TeamEmployees />
 
