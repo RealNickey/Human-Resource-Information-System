@@ -323,7 +323,16 @@ export async function createEmployeeProfile(
   formData: FormData
 ): Promise<CreateProfileState> {
   try {
-    const submission = createProfileSchema.parse(Object.fromEntries(formData));
+    // Convert empty strings to null/undefined for proper validation
+    const rawData = Object.fromEntries(formData);
+    const cleanedData = Object.fromEntries(
+      Object.entries(rawData).map(([key, value]) => [
+        key,
+        typeof value === "string" && value.trim() === "" ? null : value,
+      ])
+    );
+
+    const submission = createProfileSchema.parse(cleanedData);
 
     const supabase = await createClient();
     const {
@@ -385,9 +394,12 @@ export async function createEmployeeProfile(
     redirect("/employee/dashboard");
   } catch (error) {
     if (error instanceof z.ZodError) {
+      const firstError = error.issues[0];
       return {
         status: "error",
-        message: "Please complete all required fields.",
+        message: firstError
+          ? `${firstError.path.join(".")}: ${firstError.message}`
+          : "Please complete all required fields correctly.",
       };
     }
     console.error("Unexpected error creating employee profile", error);

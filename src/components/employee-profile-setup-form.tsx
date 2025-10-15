@@ -19,11 +19,29 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Department } from "@/lib/types";
 
 interface EmployeeProfileSetupFormProps {
   email: string | null | undefined;
   departments?: Array<Pick<Department, "id" | "name">>;
+}
+
+interface FormData {
+  first_name: string;
+  last_name: string;
+  date_of_birth: Date | undefined;
+  date_of_joining: Date | undefined;
+  department_id: string;
+  phone: string;
+  address: string;
+  emergency_contact_name: string;
+  emergency_contact_phone: string;
+}
+
+interface FieldError {
+  field: string;
+  message: string;
 }
 
 export function EmployeeProfileSetupForm({
@@ -32,11 +50,68 @@ export function EmployeeProfileSetupForm({
 }: EmployeeProfileSetupFormProps) {
   const [state, setState] = useState<CreateProfileState>({ status: "idle" });
   const [isPending, startTransition] = useTransition();
+  const [fieldErrors, setFieldErrors] = useState<FieldError[]>([]);
 
-  function handleAction(formData: FormData) {
+  // Initialize form data with default date of joining as today
+  const [formData, setFormData] = useState<FormData>({
+    first_name: "",
+    last_name: "",
+    date_of_birth: undefined,
+    date_of_joining: new Date(),
+    department_id: "",
+    phone: "",
+    address: "",
+    emergency_contact_name: "",
+    emergency_contact_phone: "",
+  });
+
+  // Client-side validation
+  const validateForm = (): boolean => {
+    const errors: FieldError[] = [];
+
+    if (!formData.first_name.trim()) {
+      errors.push({ field: "first_name", message: "First name is required" });
+    }
+    if (!formData.last_name.trim()) {
+      errors.push({ field: "last_name", message: "Last name is required" });
+    }
+    if (!formData.date_of_joining) {
+      errors.push({
+        field: "date_of_joining",
+        message: "Date of joining is required",
+      });
+    }
+
+    setFieldErrors(errors);
+    return errors.length === 0;
+  };
+
+  const getFieldError = (fieldName: string): string | undefined => {
+    return fieldErrors.find((error) => error.field === fieldName)?.message;
+  };
+
+  function handleAction(nativeFormData: globalThis.FormData) {
+    // Clear previous errors
+    setFieldErrors([]);
+
+    // Validate form before submission
+    if (!validateForm()) {
+      setState({
+        status: "error",
+        message: "Please complete all required fields correctly",
+      });
+      return;
+    }
+
     startTransition(async () => {
-      const result = await createEmployeeProfile(state, formData);
+      const result = await createEmployeeProfile(state, nativeFormData);
       setState(result);
+
+      // Only clear form on success
+      if (result.status === "success") {
+        // Form will redirect, no need to clear
+      }
+      // On error, form data is preserved via state
     });
   }
 
@@ -44,7 +119,7 @@ export function EmployeeProfileSetupForm({
     <Card>
       <CardHeader>
         <CardTitle className="text-base font-semibold">
-          Welcome! Let's set up your employee profile
+          Welcome! Let&apos;s set up your employee profile
         </CardTitle>
         <CardDescription>
           Complete your profile to access your personalized dashboard with
@@ -60,7 +135,7 @@ export function EmployeeProfileSetupForm({
             </p>
             <ul className="text-emerald-800 dark:text-emerald-200 space-y-1 ml-4 list-disc">
               <li>Your unique employee ID will be generated automatically</li>
-              <li>You'll be redirected to your full employee dashboard</li>
+              <li>You&apos;ll be redirected to your full employee dashboard</li>
               <li>
                 You can immediately view attendance, request leave, and check
                 salary info
@@ -76,51 +151,130 @@ export function EmployeeProfileSetupForm({
             <Input
               id="email"
               name="email"
+              type="email"
               value={email ?? ""}
               readOnly
               disabled
+              autoComplete="email"
+              className="bg-muted"
             />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="first_name">First name</Label>
+            <Label htmlFor="first_name">
+              First name <span className="text-destructive">*</span>
+            </Label>
             <Input
               id="first_name"
               name="first_name"
-              placeholder="First name"
+              placeholder="John"
               required
+              autoComplete="given-name"
+              value={formData.first_name}
+              onChange={(e) =>
+                setFormData({ ...formData, first_name: e.target.value })
+              }
+              aria-invalid={!!getFieldError("first_name")}
+              aria-describedby={
+                getFieldError("first_name") ? "first_name-error" : undefined
+              }
+              className={
+                getFieldError("first_name") ? "border-destructive" : ""
+              }
             />
+            {getFieldError("first_name") && (
+              <p id="first_name-error" className="text-sm text-destructive">
+                {getFieldError("first_name")}
+              </p>
+            )}
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="last_name">Last name</Label>
+            <Label htmlFor="last_name">
+              Last name <span className="text-destructive">*</span>
+            </Label>
             <Input
               id="last_name"
               name="last_name"
-              placeholder="Last name"
+              placeholder="Doe"
               required
+              autoComplete="family-name"
+              value={formData.last_name}
+              onChange={(e) =>
+                setFormData({ ...formData, last_name: e.target.value })
+              }
+              aria-invalid={!!getFieldError("last_name")}
+              aria-describedby={
+                getFieldError("last_name") ? "last_name-error" : undefined
+              }
+              className={getFieldError("last_name") ? "border-destructive" : ""}
             />
+            {getFieldError("last_name") && (
+              <p id="last_name-error" className="text-sm text-destructive">
+                {getFieldError("last_name")}
+              </p>
+            )}
           </div>
           <div className="grid gap-2">
             <Label htmlFor="date_of_birth">Date of birth</Label>
-            <Input id="date_of_birth" name="date_of_birth" type="date" />
+            <DatePicker
+              id="date_of_birth"
+              name="date_of_birth"
+              value={formData.date_of_birth}
+              onChange={(date) =>
+                setFormData({ ...formData, date_of_birth: date })
+              }
+              placeholder="Select your birth date"
+              autoComplete="bday"
+              toDate={new Date()}
+            />
+            <p className="text-xs text-muted-foreground">
+              Optional: Used for birthday notifications
+            </p>
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="date_of_joining">Date of joining</Label>
-            <Input
+            <Label htmlFor="date_of_joining">
+              Date of joining <span className="text-destructive">*</span>
+            </Label>
+            <DatePicker
               id="date_of_joining"
               name="date_of_joining"
-              type="date"
+              value={formData.date_of_joining}
+              onChange={(date) =>
+                setFormData({ ...formData, date_of_joining: date })
+              }
+              placeholder="Select your joining date"
               required
-              defaultValue={new Date().toISOString().slice(0, 10)}
+              aria-invalid={!!getFieldError("date_of_joining")}
+              aria-describedby={
+                getFieldError("date_of_joining")
+                  ? "date_of_joining-error"
+                  : undefined
+              }
+              className={
+                getFieldError("date_of_joining") ? "border-destructive" : ""
+              }
             />
+            {getFieldError("date_of_joining") && (
+              <p
+                id="date_of_joining-error"
+                className="text-sm text-destructive"
+              >
+                {getFieldError("date_of_joining")}
+              </p>
+            )}
           </div>
           <div className="grid gap-2">
             <Label htmlFor="department_id">Department</Label>
             <select
               id="department_id"
               name="department_id"
-              className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              value={formData.department_id}
+              onChange={(e) =>
+                setFormData({ ...formData, department_id: e.target.value })
+              }
+              autoComplete="organization-title"
+              className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-colors"
             >
-              <option value="">Select department</option>
+              <option value="">Select department (optional)</option>
               {departments && departments.length
                 ? departments.map((department) => (
                     <option key={department.id} value={department.id}>
@@ -136,30 +290,86 @@ export function EmployeeProfileSetupForm({
                     )
                   )}
             </select>
+            <p className="text-xs text-muted-foreground">
+              Optional: Can be assigned later by your manager
+            </p>
           </div>
           <div className="grid gap-2">
             <Label htmlFor="phone">Phone number</Label>
-            <Input id="phone" name="phone" placeholder="e.g. +1 555 123 4567" />
+            <Input
+              id="phone"
+              name="phone"
+              type="tel"
+              placeholder="+1 (555) 123-4567"
+              autoComplete="tel"
+              value={formData.phone}
+              onChange={(e) =>
+                setFormData({ ...formData, phone: e.target.value })
+              }
+            />
+            <p className="text-xs text-muted-foreground">
+              Optional: For work-related communications
+            </p>
           </div>
           <div className="grid gap-2 md:col-span-2">
             <Label htmlFor="address">Address</Label>
-            <Textarea id="address" name="address" rows={3} />
+            <Textarea
+              id="address"
+              name="address"
+              rows={3}
+              placeholder="123 Main Street, City, State, ZIP"
+              autoComplete="street-address"
+              value={formData.address}
+              onChange={(e) =>
+                setFormData({ ...formData, address: e.target.value })
+              }
+            />
+            <p className="text-xs text-muted-foreground">
+              Optional: Your current residential address
+            </p>
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="emergency_contact_name">Emergency contact</Label>
+            <Label htmlFor="emergency_contact_name">
+              Emergency contact name
+            </Label>
             <Input
               id="emergency_contact_name"
               name="emergency_contact_name"
-              placeholder="Contact name"
+              placeholder="Jane Doe"
+              autoComplete="name"
+              value={formData.emergency_contact_name}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  emergency_contact_name: e.target.value,
+                })
+              }
             />
+            <p className="text-xs text-muted-foreground">
+              Optional: Person to contact in case of emergency
+            </p>
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="emergency_contact_phone">Emergency phone</Label>
+            <Label htmlFor="emergency_contact_phone">
+              Emergency contact phone
+            </Label>
             <Input
               id="emergency_contact_phone"
               name="emergency_contact_phone"
-              placeholder="e.g. +1 555 987 6543"
+              type="tel"
+              placeholder="+1 (555) 987-6543"
+              autoComplete="tel"
+              value={formData.emergency_contact_phone}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  emergency_contact_phone: e.target.value,
+                })
+              }
             />
+            <p className="text-xs text-muted-foreground">
+              Optional: Emergency contact phone number
+            </p>
           </div>
         </CardContent>
         <CardFooter className="flex items-center justify-between border-t pt-4">
@@ -189,31 +399,37 @@ function StatusMessage({
 }) {
   if (state.status === "success") {
     return (
-      <p className="flex items-center gap-2 text-sm text-emerald-600 font-medium">
+      <div className="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400 font-medium animate-in fade-in slide-in-from-left-2 duration-300">
         <IconCircleCheckFilled className="size-4" />
-        {state.message} Redirecting to dashboard...
-      </p>
+        <span>{state.message} Redirecting to dashboard...</span>
+      </div>
     );
   }
 
   if (state.status === "error") {
     return (
-      <p className="text-sm text-rose-600 font-medium">⚠️ {state.message}</p>
+      <div className="flex items-center gap-2 text-sm text-rose-600 dark:text-rose-400 font-medium animate-in fade-in slide-in-from-left-2 duration-300">
+        <span className="text-base" aria-hidden="true">
+          ⚠️
+        </span>
+        <span role="alert">{state.message}</span>
+      </div>
     );
   }
 
   if (isPending) {
     return (
-      <p className="text-sm text-muted-foreground flex items-center gap-2">
-        <IconLoader className="size-4 animate-spin" />
-        Setting up your profile...
-      </p>
+      <div className="text-sm text-muted-foreground flex items-center gap-2">
+        <IconLoader className="size-4 animate-spin" aria-hidden="true" />
+        <span>Setting up your profile...</span>
+      </div>
     );
   }
 
   return (
-    <p className="text-xs text-muted-foreground">
-      Required fields: First name, Last name, Date of joining
-    </p>
+    <div className="text-xs text-muted-foreground">
+      <span className="font-medium">Required fields:</span> First name, Last
+      name, Date of joining
+    </div>
   );
 }
