@@ -334,10 +334,12 @@ export function ManagerAttendanceTracking() {
                     new Date(current.to) < date ? toIsoDate(date) : current.to,
                 }));
               }}
-              toDate={(() => {
-                const parsed = new Date(dateRange.to);
-                return Number.isNaN(parsed.getTime()) ? undefined : parsed;
-              })() ?? today}
+              toDate={
+                (() => {
+                  const parsed = new Date(dateRange.to);
+                  return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+                })() ?? today
+              }
               className="w-full"
             />
           </div>
