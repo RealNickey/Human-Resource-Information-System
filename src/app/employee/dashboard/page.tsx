@@ -13,6 +13,7 @@ import { ProfileUpdateForm } from "@/components/profile-update-form";
 import { SalaryInformation } from "@/components/salary-information";
 import { createClient } from "@/lib/server";
 import { Department, Employee, UserRole } from "@/lib/types";
+import { ANNUAL_LEAVE_ALLOWANCE } from "@/lib/constants";
 
 export default async function EmployeeDashboard() {
   const supabase = await createClient();
@@ -120,9 +121,6 @@ export default async function EmployeeDashboard() {
     </main>
   );
 }
-
-// Annual leave allowance used to compute remaining leave days.
-const ANNUAL_LEAVE_ALLOWANCE = 20;
 
 const friendlyDateFormatter = new Intl.DateTimeFormat("en-US", {
   month: "short",

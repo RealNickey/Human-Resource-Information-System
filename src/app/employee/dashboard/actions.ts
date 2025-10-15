@@ -2,6 +2,7 @@
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { createClient } from "@/lib/server";
@@ -381,11 +382,7 @@ export async function createEmployeeProfile(
     }
 
     revalidatePath("/employee/dashboard");
-
-    return {
-      status: "success",
-      message: "Profile created successfully.",
-    };
+    redirect("/employee/dashboard");
   } catch (error) {
     if (error instanceof z.ZodError) {
       return {

@@ -15,9 +15,7 @@ export default async function ProtectedPage() {
   const userRole = data.claims.user_metadata?.role as UserRole | undefined
 
   // Redirect to role-specific dashboard
-  if (userRole === 'admin') {
-    redirect('/admin/dashboard')
-  } else if (userRole === 'manager') {
+  if (userRole === 'manager') {
     redirect('/manager/dashboard')
   } else if (userRole === 'employee') {
     redirect('/employee/dashboard')

@@ -90,7 +90,6 @@ export function SignUpForm({ className, ...props }: React.ComponentPropsWithoutR
                 >
                   <option value="employee">Employee</option>
                   <option value="manager">Manager</option>
-                  <option value="admin">Admin</option>
                 </select>
               </div>
               <div className="grid gap-2">
