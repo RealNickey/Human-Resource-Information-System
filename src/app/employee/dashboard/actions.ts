@@ -176,7 +176,7 @@ const createProfileSchema = z.object({
       (value) => !Number.isNaN(new Date(value).getTime()),
       "Provide a valid joining date"
     ),
-  department_id: departmentIdSchema,
+  // Department removed - will be assigned by manager
   position: z.string().trim().max(255).optional(),
   phone: z.string().trim().max(255).optional(),
   address: z.string().trim().max(1024).optional(),
@@ -324,76 +324,19 @@ export async function createEmployeeProfile(
   _prevState: CreateProfileState,
   formData: FormData
 ): Promise<CreateProfileState> {
+  // Convert empty strings to null/undefined for proper validation
+  const rawData = Object.fromEntries(formData);
+  const cleanedData = Object.fromEntries(
+    Object.entries(rawData).map(([key, value]) => [
+      key,
+      typeof value === "string" && value.trim() === "" ? null : value,
+    ])
+  );
+
+  // Validate submission
+  let submission;
   try {
-    // Convert empty strings to null/undefined for proper validation
-    const rawData = Object.fromEntries(formData);
-    const cleanedData = Object.fromEntries(
-      Object.entries(rawData).map(([key, value]) => [
-        key,
-        typeof value === "string" && value.trim() === "" ? null : value,
-      ])
-    );
-
-    const submission = createProfileSchema.parse(cleanedData);
-
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return { status: "error", message: "You must be signed in." };
-    }
-
-    const userEmail = user.email;
-    if (!userEmail) {
-      return {
-        status: "error",
-        message: "Your account must have an email address configured.",
-      };
-    }
-
-    const { data: existing } = await supabase
-      .from("employees")
-      .select("id")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    if (existing) {
-      revalidatePath("/employee/dashboard");
-      revalidatePath("/employee/dashboard/overview");
-      redirect("/employee/dashboard/overview");
-    }
-
-    const employeeCode = await generateUniqueEmployeeCode(supabase, user.id);
-
-    const { error } = await supabase.from("employees").insert({
-      user_id: user.id,
-      employee_id: employeeCode,
-      first_name: submission.first_name,
-      last_name: submission.last_name,
-      email: userEmail,
-      date_of_birth: submission.date_of_birth || null,
-      date_of_joining: submission.date_of_joining,
-      department_id: submission.department_id ?? null,
-      position: submission.position || null,
-      phone: submission.phone || null,
-      address: submission.address || null,
-      emergency_contact_name: submission.emergency_contact_name || null,
-      emergency_contact_phone: submission.emergency_contact_phone || null,
-    });
-
-    if (error) {
-      console.error("Failed to create employee profile", error);
-      return {
-        status: "error",
-        message: "Could not create your profile. Please try again in a moment.",
-      };
-    }
-
-    revalidatePath("/employee/dashboard");
-    revalidatePath("/employee/dashboard/overview");
-    redirect("/employee/dashboard/overview");
+    submission = createProfileSchema.parse(cleanedData);
   } catch (error) {
     if (error instanceof z.ZodError) {
       const firstError = error.issues[0];
@@ -404,12 +347,76 @@ export async function createEmployeeProfile(
           : "Please complete all required fields correctly.",
       };
     }
-    console.error("Unexpected error creating employee profile", error);
     return {
       status: "error",
-      message: "Something went wrong, please try again.",
+      message: "Invalid form data.",
     };
   }
+
+  // Get authenticated user
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { status: "error", message: "You must be signed in." };
+  }
+
+  const userEmail = user.email;
+  if (!userEmail) {
+    return {
+      status: "error",
+      message: "Your account must have an email address configured.",
+    };
+  }
+
+  // Check if profile already exists
+  const { data: existing } = await supabase
+    .from("employees")
+    .select("id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (existing) {
+    // User already has a profile, redirect them (this throws and never returns)
+    revalidatePath("/employee/dashboard");
+    revalidatePath("/employee/dashboard/overview");
+    redirect("/employee/dashboard/overview");
+  }
+
+  // Generate unique employee code
+  const employeeCode = await generateUniqueEmployeeCode(supabase, user.id);
+
+  // Insert new employee profile
+  const { error } = await supabase.from("employees").insert({
+    user_id: user.id,
+    employee_id: employeeCode,
+    first_name: submission.first_name,
+    last_name: submission.last_name,
+    email: userEmail,
+    date_of_birth: submission.date_of_birth || null,
+    date_of_joining: submission.date_of_joining,
+    department_id: null, // Department removed from form, set by manager later
+    position: submission.position || null,
+    phone: submission.phone || null,
+    address: submission.address || null,
+    emergency_contact_name: submission.emergency_contact_name || null,
+    emergency_contact_phone: submission.emergency_contact_phone || null,
+  });
+
+  if (error) {
+    console.error("Failed to create employee profile", error);
+    return {
+      status: "error",
+      message: "Could not create your profile. Please try again in a moment.",
+    };
+  }
+
+  // Success - redirect to overview (this throws and never returns)
+  revalidatePath("/employee/dashboard");
+  revalidatePath("/employee/dashboard/overview");
+  redirect("/employee/dashboard/overview");
 }
 
 export async function deleteEmployeeProfile(

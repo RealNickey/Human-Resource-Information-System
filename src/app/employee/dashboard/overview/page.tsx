@@ -63,11 +63,85 @@ export default async function EmployeeDashboardOverview() {
     .eq("user_id", data.claims.sub)
     .maybeSingle();
 
-  const employee = (employeeData as Employee | null) ?? null;
+  let employee = (employeeData as Employee | null) ?? null;
 
-  // If no employee profile exists, redirect to setup
+  // If no employee profile exists, create a stub profile
   if (!employee) {
-    redirect("/employee/dashboard");
+    const userEmail = data.claims.email as string | null | undefined;
+
+    if (!userEmail) {
+      redirect("/auth/login");
+    }
+
+    // Generate employee code
+    const userId = data.claims.sub;
+    const sanitized = userId.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+    const prefix = sanitized.slice(0, 6) || "USER";
+    const randomSegment = Math.random()
+      .toString(36)
+      .substring(2, 6)
+      .toUpperCase();
+    const employeeCode = `EMP-${prefix}${randomSegment}`;
+
+    // Extract first and last name from email or use defaults
+    const emailParts = userEmail.split("@")[0]?.split(".") || [];
+    const firstName = emailParts[0] || "Employee";
+    const lastName = emailParts[1] || "User";
+
+    // Create stub profile (ignore if already exists)
+    const { error: insertError } = await supabase.from("employees").insert({
+      user_id: userId,
+      employee_id: employeeCode,
+      first_name: firstName.charAt(0).toUpperCase() + firstName.slice(1),
+      last_name: lastName.charAt(0).toUpperCase() + lastName.slice(1),
+      email: userEmail,
+      date_of_joining: new Date().toISOString().split("T")[0],
+      department_id: null,
+      position: null,
+      phone: null,
+      address: null,
+      emergency_contact_name: null,
+      emergency_contact_phone: null,
+    });
+
+    // If error is not a duplicate key error, log and redirect
+    if (insertError && insertError.code !== "23505") {
+      console.error("Failed to create stub employee profile", insertError);
+      redirect("/auth/login");
+    }
+
+    // Fetch the employee (either newly created or existing)
+    const { data: newEmployeeData } = await supabase
+      .from("employees")
+      .select(
+        `
+          id,
+          user_id,
+          employee_id,
+          first_name,
+          last_name,
+          email,
+          date_of_birth,
+          date_of_joining,
+          department_id,
+          position,
+          phone,
+          address,
+          emergency_contact_name,
+          emergency_contact_phone,
+          annual_leave_remaining,
+          department:departments(id,name,description)
+        `
+      )
+      .eq("user_id", userId)
+      .single();
+
+    employee = (newEmployeeData as Employee | null) ?? null;
+
+    if (!employee) {
+      console.error("Employee profile not found after creation attempt");
+      redirect("/auth/login");
+    }
   }
 
   const summary = await buildEmployeeSummary(

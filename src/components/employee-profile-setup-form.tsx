@@ -20,11 +20,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { DatePicker } from "@/components/ui/date-picker";
-import { Department } from "@/lib/types";
 
 interface EmployeeProfileSetupFormProps {
   email: string | null | undefined;
-  departments?: Array<Pick<Department, "id" | "name">>;
 }
 
 interface FormData {
@@ -32,7 +30,6 @@ interface FormData {
   last_name: string;
   date_of_birth: Date | undefined;
   date_of_joining: Date | undefined;
-  department_id: string;
   phone: string;
   address: string;
   emergency_contact_name: string;
@@ -46,7 +43,6 @@ interface FieldError {
 
 export function EmployeeProfileSetupForm({
   email,
-  departments,
 }: EmployeeProfileSetupFormProps) {
   const [state, setState] = useState<CreateProfileState>({ status: "idle" });
   const [isPending, startTransition] = useTransition();
@@ -58,7 +54,6 @@ export function EmployeeProfileSetupForm({
     last_name: "",
     date_of_birth: undefined,
     date_of_joining: new Date(),
-    department_id: "",
     phone: "",
     address: "",
     emergency_contact_name: "",
@@ -261,38 +256,6 @@ export function EmployeeProfileSetupForm({
                 {getFieldError("date_of_joining")}
               </p>
             )}
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="department_id">Department</Label>
-            <select
-              id="department_id"
-              name="department_id"
-              value={formData.department_id}
-              onChange={(e) =>
-                setFormData({ ...formData, department_id: e.target.value })
-              }
-              autoComplete="organization-title"
-              className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-colors"
-            >
-              <option value="">Select department (optional)</option>
-              {departments && departments.length
-                ? departments.map((department) => (
-                    <option key={department.id} value={department.id}>
-                      {department.name}
-                    </option>
-                  ))
-                : // Fallback departments requested: Sales, HR, IT, Marketing, Customer Support
-                  ["Sales", "HR", "IT", "Marketing", "Customer Support"].map(
-                    (name) => (
-                      <option key={name} value={name}>
-                        {name}
-                      </option>
-                    )
-                  )}
-            </select>
-            <p className="text-xs text-muted-foreground">
-              Optional: Can be assigned later by your manager
-            </p>
           </div>
           <div className="grid gap-2">
             <Label htmlFor="phone">Phone number</Label>
