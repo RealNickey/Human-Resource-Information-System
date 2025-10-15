@@ -34,7 +34,7 @@ const formatDate = (date: string) => {
 const formatDateRange = (start: string, end: string) => {
   const startDate = new Date(start);
   const endDate = new Date(end);
-  
+
   if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
     return `${start} – ${end}`;
   }
@@ -58,10 +58,13 @@ const leaveTypeLabels: Record<LeaveRequest["leave_type"], string> = {
 const leaveTypeColors: Record<LeaveRequest["leave_type"], string> = {
   vacation: "bg-blue-100 text-blue-900 dark:bg-blue-500/10 dark:text-blue-200",
   sick: "bg-rose-100 text-rose-900 dark:bg-rose-500/10 dark:text-rose-200",
-  personal: "bg-purple-100 text-purple-900 dark:bg-purple-500/10 dark:text-purple-200",
-  emergency: "bg-orange-100 text-orange-900 dark:bg-orange-500/10 dark:text-orange-200",
+  personal:
+    "bg-purple-100 text-purple-900 dark:bg-purple-500/10 dark:text-purple-200",
+  emergency:
+    "bg-orange-100 text-orange-900 dark:bg-orange-500/10 dark:text-orange-200",
   maternity: "bg-pink-100 text-pink-900 dark:bg-pink-500/10 dark:text-pink-200",
-  paternity: "bg-indigo-100 text-indigo-900 dark:bg-indigo-500/10 dark:text-indigo-200",
+  paternity:
+    "bg-indigo-100 text-indigo-900 dark:bg-indigo-500/10 dark:text-indigo-200",
 };
 
 export function LeaveHistory({ employeeId }: LeaveHistoryProps) {

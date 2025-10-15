@@ -154,7 +154,8 @@ export function SalaryInformation({ employeeId }: SalaryInformationProps) {
           Salary Overview
         </CardTitle>
         <p className="text-xs text-muted-foreground mt-1">
-          Your salary is adjusted based on performance evaluations and company policies
+          Your salary is adjusted based on performance evaluations and company
+          policies
         </p>
       </CardHeader>
       <CardContent className="flex flex-col gap-6">
@@ -284,7 +285,8 @@ export function SalaryInformation({ employeeId }: SalaryInformationProps) {
                       evaluation.bonus_amount !== undefined &&
                       evaluation.bonus_amount > 0 && (
                         <p className="text-xs text-emerald-600 font-medium">
-                          Bonus: {currencyFormatter.format(evaluation.bonus_amount)}
+                          Bonus:{" "}
+                          {currencyFormatter.format(evaluation.bonus_amount)}
                         </p>
                       )}
                   </div>

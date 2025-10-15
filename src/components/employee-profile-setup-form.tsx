@@ -47,8 +47,9 @@ export function EmployeeProfileSetupForm({
           Welcome! Let's set up your employee profile
         </CardTitle>
         <CardDescription>
-          Complete your profile to access your personalized dashboard with attendance tracking,
-          leave management, and salary information. All fields can be updated later.
+          Complete your profile to access your personalized dashboard with
+          attendance tracking, leave management, and salary information. All
+          fields can be updated later.
         </CardDescription>
       </CardHeader>
       <form className="grid gap-6" action={handleAction}>
@@ -60,8 +61,14 @@ export function EmployeeProfileSetupForm({
             <ul className="text-emerald-800 dark:text-emerald-200 space-y-1 ml-4 list-disc">
               <li>Your unique employee ID will be generated automatically</li>
               <li>You'll be redirected to your full employee dashboard</li>
-              <li>You can immediately view attendance, request leave, and check salary info</li>
-              <li>All information can be updated anytime from your profile settings</li>
+              <li>
+                You can immediately view attendance, request leave, and check
+                salary info
+              </li>
+              <li>
+                All information can be updated anytime from your profile
+                settings
+              </li>
             </ul>
           </div>
           <div className="grid gap-2">
@@ -114,26 +121,20 @@ export function EmployeeProfileSetupForm({
               className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               <option value="">Select department</option>
-              {departments && departments.length ? (
-                departments.map((department) => (
-                  <option key={department.id} value={department.id}>
-                    {department.name}
-                  </option>
-                ))
-              ) : (
-                // Fallback departments requested: Sales, HR, IT, Marketing, Customer Support
-                [
-                  "Sales",
-                  "HR",
-                  "IT",
-                  "Marketing",
-                  "Customer Support",
-                ].map((name) => (
-                  <option key={name} value={name}>
-                    {name}
-                  </option>
-                ))
-              )}
+              {departments && departments.length
+                ? departments.map((department) => (
+                    <option key={department.id} value={department.id}>
+                      {department.name}
+                    </option>
+                  ))
+                : // Fallback departments requested: Sales, HR, IT, Marketing, Customer Support
+                  ["Sales", "HR", "IT", "Marketing", "Customer Support"].map(
+                    (name) => (
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
+                    )
+                  )}
             </select>
           </div>
           <div className="grid gap-2">
@@ -179,10 +180,10 @@ export function EmployeeProfileSetupForm({
   );
 }
 
-function StatusMessage({ 
-  state, 
-  isPending 
-}: { 
+function StatusMessage({
+  state,
+  isPending,
+}: {
   state: CreateProfileState;
   isPending: boolean;
 }) {
@@ -197,9 +198,7 @@ function StatusMessage({
 
   if (state.status === "error") {
     return (
-      <p className="text-sm text-rose-600 font-medium">
-        ⚠️ {state.message}
-      </p>
+      <p className="text-sm text-rose-600 font-medium">⚠️ {state.message}</p>
     );
   }
 

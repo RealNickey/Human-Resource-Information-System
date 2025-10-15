@@ -3,6 +3,7 @@
 ## 🚀 Quick Start for New Employees
 
 ### First Login
+
 1. Go to `/auth/login`
 2. Enter credentials
 3. Complete profile form (first name, last name, joining date)
@@ -12,10 +13,12 @@
 ## 📍 Main Dashboard Sections
 
 ### 1. Personal Information
+
 - View your employee ID, name, department, contact info
 - Update via "Update Profile" section at bottom
 
 ### 2. Attendance Tracker
+
 - Check days worked, hours logged
 - Navigate months with arrow buttons
 - View weekly trends
@@ -23,17 +26,20 @@
 ### 3. Leave Management
 
 **Left: Leave History**
+
 - See approved leave dates
 - Track days already taken
 - View upcoming leave
 
 **Right: Request Time Off**
+
 - Select leave type
 - Choose dates (From → To)
 - Add reason (optional)
 - Submit for approval
 
 ### 4. Salary Information
+
 - Current salary amount
 - Recent changes (increase/decrease)
 - Performance ratings
@@ -41,19 +47,20 @@
 - Salary history
 
 ### 5. Update Profile
+
 - Change personal details anytime
 - Update emergency contacts
 - Modify department/phone
 
 ## 🎯 Common Tasks
 
-| Task | Steps |
-|------|-------|
-| Request vacation | Go to Leave Management → Request Time Off → Choose dates → Submit |
-| Check attendance | Go to Attendance Tracker → Use arrows to navigate months |
-| See salary history | Go to Salary Information → Scroll to history table |
-| Update phone | Go to Update Profile → Change phone → Save Changes |
-| View leave balance | Look at Request Time Off card → Top right shows remaining days |
+| Task               | Steps                                                             |
+| ------------------ | ----------------------------------------------------------------- |
+| Request vacation   | Go to Leave Management → Request Time Off → Choose dates → Submit |
+| Check attendance   | Go to Attendance Tracker → Use arrows to navigate months          |
+| See salary history | Go to Salary Information → Scroll to history table                |
+| Update phone       | Go to Update Profile → Change phone → Save Changes                |
+| View leave balance | Look at Request Time Off card → Top right shows remaining days    |
 
 ## 💡 Key Features
 
@@ -62,7 +69,7 @@
 ✅ **Performance-Based Salary** - See how ratings affect your pay  
 ✅ **Date Validation** - Can't request past dates or invalid ranges  
 ✅ **Status Badges** - Color-coded for quick recognition  
-✅ **Responsive Design** - Works on desktop, tablet, and mobile  
+✅ **Responsive Design** - Works on desktop, tablet, and mobile
 
 ## 🔒 Security
 
@@ -81,6 +88,7 @@
 ## 📊 Status Indicators
 
 ### Attendance
+
 - 🟢 Present
 - 🔴 Absent
 - 🟡 Partial Day
@@ -88,11 +96,13 @@
 - 🩹 Sick Leave
 
 ### Leave Requests
+
 - 🟡 Pending (waiting for approval)
 - 🟢 Approved (will appear in history)
 - 🔴 Rejected (reason may be provided)
 
 ### Leave Types
+
 - 🏖️ Vacation
 - 🤒 Sick Leave
 - 👤 Personal Leave

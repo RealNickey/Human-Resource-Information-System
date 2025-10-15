@@ -145,7 +145,10 @@ export default async function EmployeeDashboard() {
               <h2 className="text-lg font-semibold text-foreground mb-3">
                 ⚙️ Update Profile
               </h2>
-              <ProfileUpdateForm employee={employee} departments={departments} />
+              <ProfileUpdateForm
+                employee={employee}
+                departments={departments}
+              />
             </section>
           </>
         ) : (

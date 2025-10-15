@@ -306,50 +306,50 @@ export function LeaveRequestForm({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {isLoading ? (
-                    Array.from({ length: 3 }).map((_, index) => (
-                      <TableRow key={index}>
-                        <TableCell>
-                          <Skeleton className="h-4 w-32" />
-                        </TableCell>
-                        <TableCell>
-                          <Skeleton className="h-4 w-24" />
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Skeleton className="ml-auto h-4 w-8" />
-                        </TableCell>
-                        <TableCell>
-                          <Skeleton className="h-5 w-20" />
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : recentRequests.length > 0 ? (
-                    recentRequests.map((request) => (
-                      <TableRow key={request.id}>
-                        <TableCell className="font-medium">
-                          {formatDate(request.start_date)} –{" "}
-                          {formatDate(request.end_date)}
-                        </TableCell>
-                        <TableCell className="capitalize">
-                          {request.leave_type.replace("-", " ")}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {request.days_requested}
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="secondary"
-                            className={statusStyles[request.status]}
-                          >
-                            {request.status === "pending" && "⏳ "}
-                            {request.status === "rejected" && "✗ "}
-                            {request.status.charAt(0).toUpperCase() +
-                              request.status.slice(1)}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : null}
+                  {isLoading
+                    ? Array.from({ length: 3 }).map((_, index) => (
+                        <TableRow key={index}>
+                          <TableCell>
+                            <Skeleton className="h-4 w-32" />
+                          </TableCell>
+                          <TableCell>
+                            <Skeleton className="h-4 w-24" />
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Skeleton className="ml-auto h-4 w-8" />
+                          </TableCell>
+                          <TableCell>
+                            <Skeleton className="h-5 w-20" />
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    : recentRequests.length > 0
+                    ? recentRequests.map((request) => (
+                        <TableRow key={request.id}>
+                          <TableCell className="font-medium">
+                            {formatDate(request.start_date)} –{" "}
+                            {formatDate(request.end_date)}
+                          </TableCell>
+                          <TableCell className="capitalize">
+                            {request.leave_type.replace("-", " ")}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {request.days_requested}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="secondary"
+                              className={statusStyles[request.status]}
+                            >
+                              {request.status === "pending" && "⏳ "}
+                              {request.status === "rejected" && "✗ "}
+                              {request.status.charAt(0).toUpperCase() +
+                                request.status.slice(1)}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    : null}
                 </TableBody>
               </Table>
             </div>

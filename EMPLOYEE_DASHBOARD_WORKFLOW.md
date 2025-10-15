@@ -91,6 +91,7 @@ const { data: employeeData } = await supabase
 ```
 
 **Logic**:
+
 - If `employeeData` exists → Show full dashboard
 - If `employeeData` is null → Show profile setup form
 
@@ -99,7 +100,9 @@ const { data: employeeData } = await supabase
 **Component**: `src/components/employee-profile-setup-form.tsx`
 
 **Process**:
+
 1. User sees profile setup form with fields:
+
    - First Name (required)
    - Last Name (required)
    - Date of Birth (optional)
@@ -111,6 +114,7 @@ const { data: employeeData } = await supabase
    - Emergency Contact Phone (optional)
 
 2. Form submission triggers server action:
+
    - **Action**: `createEmployeeProfile` in `src/app/employee/dashboard/actions.ts`
    - Validates all fields using Zod schema
    - Generates unique employee ID automatically
@@ -130,18 +134,22 @@ const { data: employeeData } = await supabase
 Once profile exists, user sees these sections:
 
 #### A. Dashboard Summary Card
+
 **Component**: `src/components/employee-dashboard-summary.tsx`
 
 Displays:
+
 - Days worked this month
 - Leave days taken this year
 - Leaves remaining
 - Next payday
 
 #### B. Personal Information Section
+
 **Component**: `src/components/employee-personal-info.tsx`
 
 Shows:
+
 - Employee avatar with initials
 - Employee ID (auto-generated)
 - Full name
@@ -153,9 +161,11 @@ Shows:
 All personal details saved during onboarding.
 
 #### C. Attendance Tracker
+
 **Component**: `src/components/attendance-summary.tsx`
 
 Features:
+
 - Monthly view with navigation (previous/next month)
 - Metrics cards:
   - Days present
@@ -171,11 +181,13 @@ Features:
 **Data Source**: `attendance_records` table filtered by employee ID
 
 #### D. Leave Management
+
 **Component**: `src/components/leave-management.tsx`
 
 Two main sections:
 
 **Leave History Table**:
+
 - Shows all leave requests for current year
 - Columns: Start Date, End Date, Type, Days, Status
 - Status badges: Pending (amber), Approved (green), Rejected (red)
@@ -187,6 +199,7 @@ Two main sections:
   - Next scheduled leave
 
 **Request Time Off Form**:
+
 - Leave Type dropdown (vacation, sick, personal, emergency, maternity, paternity)
 - Start Date (date picker)
 - End Date (date picker)
@@ -201,16 +214,19 @@ Two main sections:
 **Data Source**: `leave_requests` table filtered by employee ID
 
 #### E. Salary Information
+
 **Component**: `src/components/salary-information.tsx`
 
 Displays:
 
 **Current Salary Card**:
+
 - Current base salary amount
 - Effective date
 - Currency
 
 **Change Indicator Card**:
+
 - Shows increment/decrement from previous salary
 - Visual indicators:
   - ↑ Green for increment
@@ -220,10 +236,12 @@ Displays:
 - Labels: "Increment applied" / "Decrement applied" / "No change"
 
 **Last Evaluation Card**:
+
 - Overall rating (e.g., 4.5/5)
 - Evaluation period dates
 
 **Salary History Table**:
+
 - Effective Date
 - Salary Amount
 - Type (monthly/annual)
@@ -231,6 +249,7 @@ Displays:
 - Shows last 5 records
 
 **Performance-Based Logic**:
+
 - Salary changes are driven by `performance_evaluations` table
 - Each evaluation can include:
   - `salary_adjustment_percentage`: % increase/decrease
@@ -241,13 +260,16 @@ Displays:
 - Component calculates and displays the difference
 
 **Data Sources**:
+
 - `salary_records` table
 - `performance_evaluations` table
 
 #### F. Profile Update Form
+
 **Component**: `src/components/profile-update-form.tsx`
 
 Allows users to:
+
 - Update all personal information fields
 - Change department
 - Update contact details
@@ -260,29 +282,34 @@ Allows users to:
 ### Key Tables
 
 **employees**:
+
 - Primary employee record
 - Links to `auth.users` via `user_id`
 - Contains all personal information
 - `annual_leave_remaining` field for leave balance
 
 **attendance_records**:
+
 - Daily attendance entries
 - Status: present, absent, partial, holiday, sick
 - Check-in/check-out times
 - Total hours calculated
 
 **leave_requests**:
+
 - Leave applications
 - Status: pending, approved, rejected
 - Links to approver (manager)
 - Days requested calculated from date range
 
 **salary_records**:
+
 - Historical salary data
 - Effective dates for tracking changes
 - Supports monthly/annual salary types
 
 **performance_evaluations**:
+
 - Performance review records
 - Overall rating and performance score
 - Links to evaluator
@@ -293,15 +320,17 @@ Allows users to:
 **Row Level Security (RLS)**: All tables have RLS policies
 
 **Employee Access Rules**:
+
 ```sql
 -- Employees can only see their own records
 WHERE employee_id IN (
-  SELECT e.id FROM public.employees e 
+  SELECT e.id FROM public.employees e
   WHERE e.user_id = auth.uid()
 )
 ```
 
 **Policy Enforcement**:
+
 - Employees can SELECT their own records
 - Employees can INSERT their own records
 - Employees can UPDATE their own records
@@ -310,6 +339,7 @@ WHERE employee_id IN (
 ## User Experience Flow
 
 ### First Login
+
 1. User signs up or logs in
 2. Middleware validates and routes to employee dashboard
 3. System checks for employee profile
@@ -321,6 +351,7 @@ WHERE employee_id IN (
 9. Full dashboard loads with all features
 
 ### Subsequent Logins
+
 1. User logs in
 2. Middleware routes to employee dashboard
 3. System finds existing profile
@@ -346,6 +377,7 @@ All dashboard components are located in `src/components/` and follow these princ
 ### Available UI Components
 
 All from `src/components/ui/`:
+
 - `card`, `button`, `input`, `label`, `select`
 - `table`, `skeleton`, `avatar`, `badge`
 - `chart` (for visualizations)
@@ -357,6 +389,7 @@ All from `src/components/ui/`:
 **Location**: `src/app/employee/dashboard/actions.ts`
 
 Available server actions:
+
 - `createEmployeeProfile`: Creates new employee record
 - `updateEmployeeProfile`: Updates existing employee data
 - `submitLeaveRequest`: Submits new leave request
@@ -364,6 +397,7 @@ Available server actions:
 - `deleteLeaveRequest`: Cancels leave request
 
 All actions:
+
 - Validate input with Zod schemas
 - Check user authentication
 - Verify user owns the record being modified
@@ -373,11 +407,13 @@ All actions:
 ## Configuration
 
 **Constants**: `src/lib/constants.ts`
+
 ```typescript
 export const ANNUAL_LEAVE_ALLOWANCE = 20; // days per year
 ```
 
 **Types**: `src/lib/types.ts`
+
 - Contains all TypeScript interfaces
 - Matches database schema
 - Used throughout application
@@ -394,6 +430,7 @@ export const ANNUAL_LEAVE_ALLOWANCE = 20; // days per year
 ## Future Enhancements
 
 Potential additions to the workflow:
+
 - Email notifications for leave approvals
 - Mobile app support
 - Document upload functionality
