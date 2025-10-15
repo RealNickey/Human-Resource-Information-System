@@ -15,7 +15,7 @@ export default async function EmployeeProfileSetup() {
   }
 
   const userRole = data.claims.user_metadata?.role as UserRole | undefined;
-  
+
   // Only employees and managers can access this page
   if (!userRole || !["employee", "manager"].includes(userRole)) {
     redirect("/protected");
