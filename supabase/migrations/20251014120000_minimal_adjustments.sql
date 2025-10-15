@@ -34,26 +34,31 @@ drop policy if exists "managers can view team leave requests" on public.leave_re
 drop policy if exists "managers can update team leave requests" on public.leave_requests;
 drop policy if exists "managers can view team performance" on public.performance_evaluations;
 
--- Employees: managers (or admins) can view all employees
+drop policy if exists "managers view all employees" on public.employees;
+
 create policy "managers view all employees"
   on public.employees
   for select
   to authenticated
   using ((auth.jwt() ->> 'role') in ('manager','admin'));
 
--- Attendance select for managers/admins across all employees
+drop policy if exists "managers view all attendance" on public.attendance_records;
+
 create policy "managers view all attendance"
   on public.attendance_records
   for select
   to authenticated
   using ((auth.jwt() ->> 'role') in ('manager','admin'));
 
--- Attendance insert/update by managers/admins (mark attendance for anyone)
+drop policy if exists "managers manage attendance" on public.attendance_records;
+
 create policy "managers manage attendance"
   on public.attendance_records
   for insert
   to authenticated
   with check ((auth.jwt() ->> 'role') in ('manager','admin'));
+
+drop policy if exists "managers update attendance" on public.attendance_records;
 
 create policy "managers update attendance"
   on public.attendance_records
@@ -62,14 +67,16 @@ create policy "managers update attendance"
   using ((auth.jwt() ->> 'role') in ('manager','admin'))
   with check ((auth.jwt() ->> 'role') in ('manager','admin'));
 
--- Leave requests view
+drop policy if exists "managers view all leave" on public.leave_requests;
+
 create policy "managers view all leave"
   on public.leave_requests
   for select
   to authenticated
   using ((auth.jwt() ->> 'role') in ('manager','admin'));
 
--- Leave requests update (approve / reject)
+drop policy if exists "managers update leave" on public.leave_requests;
+
 create policy "managers update leave"
   on public.leave_requests
   for update
@@ -77,7 +84,8 @@ create policy "managers update leave"
   using ((auth.jwt() ->> 'role') in ('manager','admin'))
   with check ((auth.jwt() ->> 'role') in ('manager','admin'));
 
--- Performance view
+drop policy if exists "managers view all performance" on public.performance_evaluations;
+
 create policy "managers view all performance"
   on public.performance_evaluations
   for select
