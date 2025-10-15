@@ -4,7 +4,6 @@ import { LogoutButton } from "@/components/logout-button";
 import { ManagerAttendanceTracking } from "@/components/manager-attendance-tracking";
 import { ManagerLeaveRequests } from "@/components/manager-leave-requests";
 import { TeamEmployees } from "@/components/team-employees";
-import { TeamPerformance } from "@/components/team-performance";
 import { createClient } from "@/lib/server";
 import { Employee, UserRole } from "@/lib/types";
 
@@ -47,14 +46,12 @@ export default async function ManagerDashboard() {
                   : "Manager Dashboard"}
               </h1>
               <p className="text-sm text-muted-foreground">
-                Manage your team, track performance, and approve leave requests.
+                Manage your team, track attendance, and approve leave requests.
               </p>
             </div>
             <LogoutButton />
           </div>
         </header>
-
-        <TeamPerformance />
 
         <TeamEmployees />
 

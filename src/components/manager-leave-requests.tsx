@@ -110,30 +110,31 @@ export function ManagerLeaveRequests({ managerId }: ManagerLeaveRequestsProps) {
   }, [loadLeaveRequests]);
 
   const handleStatusUpdate = (requestId: number, nextStatus: LeaveStatus) => {
-    if (!managerId) {
-      toast.error("Manager profile not found.");
-      return;
-    }
-
     startTransition(async () => {
       try {
         const supabase = createClient();
+        const approverId = managerId ?? null;
 
         if (nextStatus === "approved") {
           const { error } = await supabase.rpc("approve_leave", {
             p_leave_id: requestId,
-            p_approver_employee_id: managerId,
+            p_approver_employee_id: approverId,
           });
           if (error) throw error;
         } else if (nextStatus === "rejected") {
           const { error } = await supabase.rpc("reject_leave", {
             p_leave_id: requestId,
-            p_approver_employee_id: managerId,
+            p_approver_employee_id: approverId,
           });
           if (error) throw error;
         }
 
         toast.success(`Leave request ${nextStatus}.`);
+        if (!managerId) {
+          toast.warning(
+            "We updated the status, but we couldn't link it to your manager profile. Consider completing your profile for full tracking."
+          );
+        }
         await loadLeaveRequests();
       } catch (error) {
         console.error("Failed to update leave request", error);

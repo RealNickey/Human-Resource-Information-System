@@ -20,6 +20,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -61,6 +62,8 @@ export function LeaveManagement({
   const [isLoading, setIsLoading] = useState(true);
   const [state, setState] = useState<LeaveRequestState>({ status: "idle" });
   const [isPending, startTransition] = useTransition();
+  const [startDate, setStartDate] = useState<Date | undefined>();
+  const [endDate, setEndDate] = useState<Date | undefined>();
 
   const loadLeaveRequests = useCallback(async () => {
     if (!employeeId) {
@@ -157,6 +160,8 @@ export function LeaveManagement({
       setState(result);
       if (result.status === "success") {
         await loadLeaveRequests();
+        setStartDate(undefined);
+        setEndDate(undefined);
       }
     });
   }
@@ -292,11 +297,30 @@ export function LeaveManagement({
           </div>
           <div>
             <Label htmlFor="start_date">Start date</Label>
-            <Input id="start_date" name="start_date" type="date" required />
+            <DatePicker
+              id="start_date"
+              name="start_date"
+              value={startDate}
+              onChange={(date) => {
+                setStartDate(date ?? undefined);
+                if (date && endDate && date > endDate) {
+                  setEndDate(date);
+                }
+              }}
+              required
+              toDate={endDate ?? undefined}
+            />
           </div>
           <div>
             <Label htmlFor="end_date">End date</Label>
-            <Input id="end_date" name="end_date" type="date" required />
+            <DatePicker
+              id="end_date"
+              name="end_date"
+              value={endDate}
+              onChange={(date) => setEndDate(date ?? undefined)}
+              required
+              fromDate={startDate}
+            />
           </div>
           <div className="sm:col-span-4">
             <Label htmlFor="reason">Reason</Label>
